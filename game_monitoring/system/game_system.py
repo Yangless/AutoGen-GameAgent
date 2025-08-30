@@ -1,0 +1,101 @@
+import asyncio
+import random
+import time
+from datetime import datetime
+
+from config import custom_model_client
+from ..simulator import PlayerBehaviorSimulator
+from ..monitoring import BehaviorMonitor
+from ..monitoring.player_state import PlayerStateManager
+from ..team import GameMonitoringTeam
+from ..ui import GameMonitoringConsole
+
+class GamePlayerMonitoringSystem:
+    """游戏玩家监控系统主协调器"""
+    
+    def __init__(self, model_client=None):
+        self.model_client = model_client or custom_model_client
+        self.simulator = PlayerBehaviorSimulator()
+        # 创建监控器实例
+        self.monitor = BehaviorMonitor()
+        # 创建玩家状态管理器实例
+        self.player_state_manager = PlayerStateManager()
+        
+        # 初始化全局上下文
+        from ..context import initialize_context
+        initialize_context(self.monitor, self.player_state_manager)
+        
+        # 创建多智能体团队，使用默认 player_id
+        self.team = GameMonitoringTeam(
+            model_client=self.model_client,
+            player_id="player_1"  # 默认玩家ID，可以根据需要动态创建
+        )
+        
+        # 创建UI控制台
+        self.ui = GameMonitoringConsole()
+        
+        print("🎮 游戏玩家实时行为监控助手系统已初始化 (最终架构)")
+
+    async def trigger_analysis_and_intervention(self, player_id: str):
+        """触发对指定玩家的分析和干预"""
+        self.ui.print_team_activation(player_id)
+        await self.team.trigger_analysis_and_intervention(player_id, self.monitor)
+
+    async def simulate_monitoring_session(self, duration_seconds: int = 60, mode: str = "random", dataset_type: str = "mixed"):
+        """
+        模拟监控会话
+        
+        Args:
+            duration_seconds: 会话持续时间（秒）
+            mode: 数据生成模式 - "random" 随机生成 或 "preset" 预设序列
+            dataset_type: 当mode="preset"时，指定数据集类型（"mixed", "negative", "positive"）
+        """
+        self.ui.print_session_start(duration_seconds, mode)
+        
+        if mode == "random":
+            # 随机生成模式
+            players = [f"player_{random.randint(100, 999)}" for _ in range(5)]
+            start_time = time.time()
+            
+            while time.time() - start_time < duration_seconds:
+                player_id = random.choice(players)
+                behavior = self.simulator.generate_behavior(player_id)
+                self.ui.print_behavior_log(player_id, behavior.action)
+                
+                # 将生成的行为数据保存到monitor中
+                if self.monitor.add_behavior(behavior):
+                    await self.trigger_analysis_and_intervention(player_id)
+                    self.monitor.player_negative_counts[player_id] = 0
+                    self.ui.print_reset_count(player_id)
+                
+                await asyncio.sleep(random.uniform(2, 4)) # 增加间隔以便观察
+                
+        elif mode == "preset":
+            # 预设序列模式
+            self.ui.print_dataset_loading(dataset_type)
+            
+            # 生成预设数据集
+            dataset = self.simulator.generate_mock_dataset(dataset_type, num_players=5)
+            self.ui.print_dataset_generated(len(dataset))
+            
+            # 将数据加载到监控器中并触发分析
+            for player_id, behaviors in dataset.items():
+                self.ui.print_player_processing(player_id)
+                
+                for behavior in behaviors:
+                    self.ui.print_behavior_log(player_id, behavior.action)
+                    
+                    # 将行为数据保存到monitor中
+                    if self.monitor.add_behavior(behavior):
+                        await self.trigger_analysis_and_intervention(player_id)
+                        self.monitor.player_negative_counts[player_id] = 0
+                        self.ui.print_reset_count(player_id)
+                    
+                    # 模拟实时处理间隔
+                    await asyncio.sleep(1)
+                    
+        else:
+            self.ui.print_unsupported_mode(mode)
+            return
+        
+        self.ui.print_session_end()
