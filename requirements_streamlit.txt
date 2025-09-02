@@ -1,0 +1,20 @@
+# Streamlit Dashboard 依赖包
+streamlit>=1.28.0
+asyncio-compat>=0.1.2
+nest-asyncio>=1.5.6
+
+# 现有项目依赖（根据代码推断）
+autogen-agentchat>=0.2.0
+openai>=1.0.0
+requests>=2.31.0
+python-dotenv>=1.0.0
+
+# 数据处理
+pandas>=2.0.0
+numpy>=1.24.0
+
+# 日期时间处理
+python-dateutil>=2.8.0
+
+# 类型提示支持
+typing-extensions>=4.5.0

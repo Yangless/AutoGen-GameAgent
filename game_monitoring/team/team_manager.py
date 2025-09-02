@@ -14,6 +14,7 @@ from ..agents.intervention_agents import (
 from ..monitoring.behavior_monitor import BehaviorMonitor
 from typing import List
 
+
 class GameMonitoringTeam:
     """游戏监控多智能体团队管理器"""
     

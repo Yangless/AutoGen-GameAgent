@@ -42,14 +42,6 @@ def detect_bot_with_deps(player_id: str) -> str:
     
     analysis_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     if is_context_initialized():
-        # 使用真实的状态管理器
-    # def update_bot_detection(self, player_id: str, is_bot: bool, confidence: float, patterns: List[str]):
-    #     state = self.get_or_create_state(player_id)
-    #     state.is_bot = is_bot
-    #     state.bot_confidence = confidence
-    #     state.bot_patterns = patterns
-    #     state.last_updated = datetime.now()
-
         player_state_manager.update_bot_detection(player_id,  
                                                     is_bot,
                                                     round(final_confidence, 2),
