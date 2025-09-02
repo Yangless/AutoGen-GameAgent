@@ -6,6 +6,152 @@ from typing import Dict, List
 from .player_behavior import PlayerBehavior
 
 
+import time
+from typing import List, Dict, Any
+
+class PlayerBehaviorRuleEngine:
+    """
+    一个规则引擎，用于通过分析细粒度的玩家动作序列来识别高层级的行为场景。
+
+    每个 `check_` 方法都对应一条触发规则，并返回一个列表，
+    其中包含触发了该规则的具体动作。如果规则未被触发，则返回空列表。
+    """
+
+    # --- 基础游戏行为检测 ---
+
+    def check_login(self, actions: List[Dict]) -> List[Dict]:
+        """规则: 记录到 login 动作。"""
+        return [a for a in actions if a.get('action') == 'login']
+
+    def check_enter_dungeon(self, actions: List[Dict]) -> List[Dict]:
+        """规则: 记录到 enter_dungeon 动作。"""
+        return [a for a in actions if a.get('action') == 'enter_dungeon']
+    
+    def check_open_world_chat(self, actions: List[Dict]) -> List[Dict]:
+        """规则: 记录到 send_chat_message 且 channel 为 'world'。"""
+        return [a for a in actions if a.get('action') == 'send_chat_message' and a.get('params', {}).get('channel') == 'world']
+
+    # --- 积极情绪相关检测 ---
+
+    def check_successful_hard_dungeon_completion(self, actions: List[Dict]) -> List[Dict]:
+        """规则: 记录到 complete_dungeon 且 status='success' 且 difficulty='hard'。"""
+        return [
+            a for a in actions if a.get('action') == 'complete_dungeon' 
+            and a.get('params', {}).get('status') == 'success'
+            and a.get('params', {}).get('difficulty') == 'hard'
+        ]
+
+    def check_successful_upgrade(self, actions: List[Dict]) -> List[Dict]:
+        """规则: 记录到 upgrade_skill 或 upgrade_building 且 status='success'。"""
+        return [
+            a for a in actions if a.get('action') in ['upgrade_skill', 'upgrade_building']
+            and a.get('params', {}).get('status') == 'success'
+        ]
+        
+    def check_legendary_hero_recruitment(self, actions: List[Dict]) -> List[Dict]:
+        """规则: 记录到 recruit_hero 且 rarity='legendary'。"""
+        return [
+            a for a in actions if a.get('action') == 'recruit_hero'
+            and a.get('params', {}).get('rarity') == 'legendary'
+        ]
+
+    # --- 消极情绪相关检测 ---
+
+    def check_consecutive_dungeon_failures(self, actions: List[Dict], count: int = 3) -> List[Dict]:
+        """规则: 短时间内连续记录到多次 complete_dungeon 且 status='fail'。"""
+        failure_streak = []
+        for action in actions:
+            if action.get('action') == 'complete_dungeon' and action.get('params', {}).get('status') == 'fail':
+                failure_streak.append(action)
+                if len(failure_streak) >= count:
+                    return failure_streak  # 找到满足条件的连续失败序列
+            else:
+                failure_streak = []  # 任何其他动作都会打断连续性
+        return []
+
+    def check_multiple_pvp_losses(self, actions: List[Dict], count: int = 3) -> List[Dict]:
+        """规则: 短时间内记录到多次 lose_pvp 或 be_attacked (防守失败)。"""
+        losses = [a for a in actions if a.get('action') in ['lose_pvp', 'be_attacked']]
+        if len(losses) >= count:
+            return losses
+        return []
+
+    def check_consecutive_recruit_failures(self, actions: List[Dict], count: int = 10) -> List[Dict]:
+        """规则: 连续执行 recruit_hero 多次，但 rarity 均未达到 'rare' 或更高。"""
+        failure_streak = []
+        for action in actions:
+            if action.get('action') == 'recruit_hero':
+                if action.get('params', {}).get('rarity') == 'common':
+                    failure_streak.append(action)
+                    if len(failure_streak) >= count:
+                        return failure_streak
+                else:
+                    failure_streak = [] # 抽到稀有或以上卡，打断连续失败
+            else:
+                # 其他非抽卡动作不打断连续性
+                pass
+        return []
+        
+    def check_venting_in_world_chat(self, actions: List[Dict], negative_keywords: List[str]) -> List[Dict]:
+        """规则: 在世界频道发泄不满 (包含负面关键词)。"""
+        venting_actions = []
+        for a in actions:
+            if a.get('action') == 'send_chat_message' and a.get('params', {}).get('channel') == 'world':
+                message = a.get('params', {}).get('message_content', '').lower()
+                if any(keyword in message for keyword in negative_keywords):
+                    venting_actions.append(a)
+        return venting_actions
+
+    # --- 流失风险相关检测 (部分需要外部状态) ---
+
+    def check_long_time_no_login(self, player_last_login_time: int, days: int = 3) -> bool:
+        """规则: 连续N天未登录。这是一个需要外部状态的检查。"""
+        current_timestamp = int(time.time())
+        seconds_in_day = 86400
+        return (current_timestamp - player_last_login_time) >= days * seconds_in_day
+
+    def check_playtime_drop(self, current_week_playtime: float, historical_avg_playtime: float, threshold: float = 0.5) -> bool:
+        """规则: 游戏时长急剧下降。需要预先计算好的外部状态。"""
+        if historical_avg_playtime == 0: return False
+        return (current_week_playtime / historical_avg_playtime) < threshold
+
+    def check_bulk_item_sell(self, actions: List[Dict], count: int = 5) -> List[Dict]:
+        """规则: 短时间内大量出售游戏道具。"""
+        sell_actions = [a for a in actions if a.get('action') == 'sell_item']
+        if len(sell_actions) >= count:
+            return sell_actions
+        return []
+        
+    def check_farewell_nickname(self, actions: List[Dict], farewell_keywords: List[str]) -> List[Dict]:
+        """规则: 修改昵称为告别语。"""
+        farewell_actions = []
+        for a in actions:
+            if a.get('action') == 'change_nickname':
+                new_name = a.get('params', {}).get('new_name', '').lower()
+                if any(keyword in new_name for keyword in farewell_keywords):
+                    farewell_actions.append(a)
+        return farewell_actions
+
+    # --- 机器人行为相关检测 ---
+    
+    def check_abnormally_high_action_rate(self, actions: List[Dict], time_window_seconds: int = 1, rate_threshold: int = 10) -> List[Dict]:
+        """规则: 操作频率异常高。注意: 这是一个计算密集型操作。"""
+        from datetime import timedelta
+        actions.sort(key=lambda x: x.get('timestamp', datetime.min)) # 确保按时间排序
+        for i, action in enumerate(actions):
+            window_start_time = action.get('timestamp', datetime.min)
+            actions_in_window = [action]
+            # 查看后续动作是否在时间窗口内
+            for next_action in actions[i+1:]:
+                next_timestamp = next_action.get('timestamp', datetime.min)
+                if next_timestamp <= window_start_time + timedelta(seconds=time_window_seconds):
+                    actions_in_window.append(next_action)
+                else:
+                    break
+            if len(actions_in_window) > rate_threshold:
+                return actions_in_window
+        return []
+
 class PlayerBehaviorSimulator:
     def __init__(self):
         # 基础游戏行为场景

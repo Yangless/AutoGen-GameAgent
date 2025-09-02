@@ -1,5 +1,8 @@
 # 游戏玩家行为分析系统 - 使用指南
 
+## Streamlit 应用
+python -m streamlit run streamlit_dashboard.py --server.port=8502 
+
 ## 数据生成模式
 
 系统支持两种数据生成模式，可以通过参数控制启动方式：

@@ -2,6 +2,7 @@ import asyncio
 import sys
 from game_monitoring.system import GamePlayerMonitoringSystem
 
+
 async def main(mode: str = "random", dataset_type: str = "mixed", duration: int = 60):
     """
     主函数
@@ -19,7 +20,8 @@ async def main(mode: str = "random", dataset_type: str = "mixed", duration: int 
     print(f"   - 数据模式: {mode}")
     if mode == "preset":
         print(f"   - 数据集类型: {dataset_type}")
-    print(f"   - 持续时间: {duration}秒")
+    if mode != "interactive":
+        print(f"   - 持续时间: {duration}秒")
     print("-" * 50)
     
     system = GamePlayerMonitoringSystem()
@@ -42,13 +44,13 @@ def run_demo():
         
         print("\n💡 使用说明:")
         print("   python main.py [mode] [dataset_type] [duration]")
-        print("   - mode: 'random' (随机生成) 或 'preset' (预设序列)")
+        print("   - mode: 'random' (随机生成), 'preset' (预设序列), 'interactive' (交互式动态触发)")
         print("   - dataset_type: 'mixed', 'negative', 'positive' (仅preset模式)")
-        print("   - duration: 持续时间（秒）")
+        print("   - duration: 持续时间（秒，interactive模式忽略此参数）")
         print("\n示例:")
         print("   python main.py random")
         print("   python main.py preset negative 30")
-        print("   python main.py preset mixed 45")
+        print("   python main.py interactive")
         print()
     
     asyncio.run(main(mode, dataset_type, duration))

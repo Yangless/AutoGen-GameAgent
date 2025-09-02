@@ -9,6 +9,7 @@ from ..monitoring import BehaviorMonitor
 from ..monitoring.player_state import PlayerStateManager
 from ..team import GameMonitoringTeam
 from ..ui import GameMonitoringConsole
+from .action_sequence_manager import ActionSequenceManager
 
 class GamePlayerMonitoringSystem:
     """游戏玩家监控系统主协调器"""
@@ -17,7 +18,7 @@ class GamePlayerMonitoringSystem:
         self.model_client = model_client or custom_model_client
         self.simulator = PlayerBehaviorSimulator()
         # 创建监控器实例
-        self.monitor = BehaviorMonitor()
+        self.monitor = BehaviorMonitor(threshold=3)
         # 创建玩家状态管理器实例
         self.player_state_manager = PlayerStateManager()
         
@@ -34,12 +35,16 @@ class GamePlayerMonitoringSystem:
         # 创建UI控制台
         self.ui = GameMonitoringConsole()
         
-        print("🎮 游戏玩家实时行为监控助手系统已初始化 (最终架构)")
+        # 创建动作序列管理器（新的动态触发模式）
+        self.action_manager = ActionSequenceManager(self.monitor, self.team)
+        
+        print("🎮 游戏玩家实时行为监控助手系统已初始化 (支持动态触发架构)")
 
     async def trigger_analysis_and_intervention(self, player_id: str):
         """触发对指定玩家的分析和干预"""
         self.ui.print_team_activation(player_id)
         await self.team.trigger_analysis_and_intervention(player_id, self.monitor)
+        self.monitor.player_negative_counts[player_id] = 0
 
     async def simulate_monitoring_session(self, duration_seconds: int = 60, mode: str = "random", dataset_type: str = "mixed"):
         """
@@ -47,7 +52,7 @@ class GamePlayerMonitoringSystem:
         
         Args:
             duration_seconds: 会话持续时间（秒）
-            mode: 数据生成模式 - "random" 随机生成 或 "preset" 预设序列
+            mode: 数据生成模式 - "random" 随机生成, "preset" 预设序列, 或 "interactive" 交互式动态触发
             dataset_type: 当mode="preset"时，指定数据集类型（"mixed", "negative", "positive"）
         """
         self.ui.print_session_start(duration_seconds, mode)
@@ -94,8 +99,19 @@ class GamePlayerMonitoringSystem:
                     # 模拟实时处理间隔
                     await asyncio.sleep(1)
                     
+        elif mode == "interactive":
+            # 新的交互式动态触发模式
+            print("\n🚀 启动交互式动态触发模式...")
+            print("   这是新一代AI智能体触发流程:")
+            print("   A(原子动作) -> B(规则引擎) -> C(智能体分析)")
+            print("-" * 50)
+            
+            # 启动动作序列管理器
+            await self.action_manager.start_interactive_session()
+            
         else:
-            self.ui.print_unsupported_mode(mode)
+            supported_modes = ["random", "preset", "interactive"]
+            print(f"❌ 不支持的模式: {mode}，请使用: {', '.join(supported_modes)}")
             return
         
         self.ui.print_session_end()
