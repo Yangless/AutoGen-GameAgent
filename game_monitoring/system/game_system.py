@@ -38,13 +38,13 @@ class GamePlayerMonitoringSystem:
         # 创建动作序列管理器（新的动态触发模式）
         self.action_manager = ActionSequenceManager(self.monitor, self.team)
         
-        print("🎮 游戏玩家实时行为监控助手系统已初始化 (支持动态触发架构)")
+        print("🎮 游戏Agent助手系统已初始化 (支持动态触发架构)")
 
     async def trigger_analysis_and_intervention(self, player_id: str):
         """触发对指定玩家的分析和干预"""
         self.ui.print_team_activation(player_id)
         await self.team.trigger_analysis_and_intervention(player_id, self.monitor)
-        self.monitor.player_negative_counts[player_id] = 0
+        # 计数器重置现在在streamlit_dashboard.py中处理
 
     async def simulate_monitoring_session(self, duration_seconds: int = 60, mode: str = "random", dataset_type: str = "mixed"):
         """
@@ -70,7 +70,7 @@ class GamePlayerMonitoringSystem:
                 # 将生成的行为数据保存到monitor中
                 if self.monitor.add_behavior(behavior):
                     await self.trigger_analysis_and_intervention(player_id)
-                    self.monitor.player_negative_counts[player_id] = 0
+                    # 计数器重置现在在streamlit_dashboard.py中处理
                     self.ui.print_reset_count(player_id)
                 
                 await asyncio.sleep(random.uniform(2, 4)) # 增加间隔以便观察
@@ -93,7 +93,7 @@ class GamePlayerMonitoringSystem:
                     # 将行为数据保存到monitor中
                     if self.monitor.add_behavior(behavior):
                         await self.trigger_analysis_and_intervention(player_id)
-                        self.monitor.player_negative_counts[player_id] = 0
+                        # 计数器重置现在在streamlit_dashboard.py中处理
                         self.ui.print_reset_count(player_id)
                     
                     # 模拟实时处理间隔

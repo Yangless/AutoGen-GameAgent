@@ -13,6 +13,8 @@ from ..agents.intervention_agents import (
 )
 from ..monitoring.behavior_monitor import BehaviorMonitor
 from typing import List
+import mlflow
+
 
 
 class GameMonitoringTeam:
@@ -44,10 +46,10 @@ class GameMonitoringTeam:
             ],
             model_client=self.model_client
         )
-        
+    # @mlflow.trace(name="[Main-Agent] Analysis Orchestrator", span_type="ORCHESTRATOR")
     async def trigger_analysis_and_intervention(self, player_id: str, monitor: BehaviorMonitor):
         """触发对指定玩家的分析和干预"""
-        print(f"\n🤖 启动多智能体团队，为玩家 {player_id} 进行分析和干预...")
+        # print(f"\n🤖 启动多智能体团队，为玩家 {player_id} 进行分析和干预...")
         behaviors = monitor.get_player_history(player_id)
         behavior_summary = "\n".join([f"- {b.timestamp.strftime('%H:%M:%S')}: {b.action}" for b in behaviors[-5:]])
 
@@ -60,9 +62,10 @@ class GameMonitoringTeam:
         {behavior_summary}
 
         **你的角色与任务:**
-        你现在是这个多智能体团队的 **首席调度官 (Chief Orchestrator)**。你的职责是高效地协调团队中的各位专家Agent，对玩家进行全面的分析，并根据分析结果执行最恰当的干预措施。
+        你现在是这个多智能体团队的 **首席调度官 (Chief Orchestrator)**。你的职责是高效地协调团队中的各位专家Agent，对玩家进行全面的分析，并根据分析结果执行最恰当的干预措施。输出为中文。
         """
         # 使用 Console UI 以流式方式运行团队，实时查看过程
         print("\n" + "="*25 + " 团队实时动态 " + "="*23)
+        
         await Console(self.analysis_team.run_stream(task=task))
         print("="*62 + "\n")
