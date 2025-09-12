@@ -3,6 +3,9 @@
 ## Streamlit 应用
 python -m streamlit run streamlit_dashboard.py --server.port=8502 
 
+## mlflow ui 使用
+mlflow ui
+
 ## 数据生成模式
 
 系统支持两种数据生成模式，可以通过参数控制启动方式：

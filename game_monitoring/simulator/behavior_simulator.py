@@ -16,6 +16,277 @@ class PlayerBehaviorRuleEngine:
     每个 `check_` 方法都对应一条触发规则，并返回一个列表，
     其中包含触发了该规则的具体动作。如果规则未被触发，则返回空列表。
     """
+    
+    def analyze_action_sequence(self, player_id: str, actions: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+        """分析玩家动作序列，返回触发的场景列表（基于最近三次行为）"""
+        triggered_scenarios = []
+        
+        # 只分析最近三次行为
+        recent_actions = actions[-3:] if len(actions) >= 3 else actions
+        
+        # 定义规则检查映射
+        rules_to_check = [
+            ('连续失败触发消极情绪', self._check_consecutive_failures, recent_actions),
+            ('社交退出行为风险', self._check_social_withdrawal_risk, recent_actions),
+            ('连续被攻击消极行为', self._check_consecutive_attacks, recent_actions),
+            ('客服求助流失风险', self._check_support_contact_risk, recent_actions),
+            ('游戏卸载流失风险', self._check_uninstall_risk, recent_actions),
+            ('充值行为积极表现', self._check_payment_behavior, recent_actions),
+            ('社交活跃表现', self._check_social_activity, recent_actions),
+            ('游戏成就积极表现', self._check_achievement_behavior, recent_actions),
+            ('异常高频操作', self._check_abnormal_frequency, recent_actions),
+            ('资产处理风险', self._check_asset_disposal_risk, recent_actions)
+        ]
+        
+        for scenario_name, rule_func, action_data in rules_to_check:
+            trigger_result = rule_func(action_data)
+            if trigger_result:
+                triggered_scenarios.append({
+                    'scenario': scenario_name,
+                    'player_id': player_id,
+                    'trigger_reason': trigger_result if isinstance(trigger_result, str) else f'规则引擎检测到{scenario_name}相关行为模式',
+                    'trigger_actions': [a.get('action', '') for a in action_data]
+                })
+                
+        return triggered_scenarios
+    
+    def _check_consecutive_failures(self, actions: List[Dict]) -> str:
+        """检查连续失败三次触发消极情绪"""
+        if len(actions) < 3:
+            return ""
+        
+        failure_actions = ['complete_dungeon', 'recruit_hero', 'upgrade_skill', 'upgrade_building', 'lose_pvp']
+        consecutive_failures = 0
+        failure_details = []
+        
+        # 从最新的动作开始向前检查连续性
+        for i in range(len(actions) - 1, -1, -1):
+            action = actions[i]
+            action_name = action.get('action', '')
+            
+            if action_name in failure_actions:
+                status = action.get('params', {}).get('status', '')
+                rarity = action.get('params', {}).get('rarity', '')
+                
+                # 判断是否为失败
+                is_failure = (
+                    status == 'fail' or 
+                    action_name == 'lose_pvp' or
+                    (action_name == 'recruit_hero' and rarity == 'common')
+                )
+                
+                if is_failure:
+                    consecutive_failures += 1
+                    failure_details.insert(0, action_name)  # 插入到开头保持时间顺序
+                else:
+                    break  # 成功打断连续失败
+            else:
+                # 非相关动作不打断连续性，继续检查
+                continue
+        
+        if consecutive_failures >= 2:
+            return f"连续失败{consecutive_failures}次：{', '.join(failure_details[:3])}"
+        return ""
+    
+    def _check_social_withdrawal_risk(self, actions: List[Dict]) -> str:
+        """检查离开家族、删除好友、清理背包出现其中两个触发消极行为和流失风险"""
+        withdrawal_actions = ['leave_family', 'remove_friend', 'clear_backpack']
+        triggered_actions = []
+        
+        for action in actions:
+            action_name = action.get('action', '')
+            if action_name in withdrawal_actions:
+                triggered_actions.append(action_name)
+        
+        if len(set(triggered_actions)) >= 2:  # 至少两种不同的退出行为
+            return f"社交退出行为：{', '.join(set(triggered_actions))}"
+        return ""
+    
+    def _check_consecutive_attacks(self, actions: List[Dict]) -> str:
+        """检查连续3次被攻击触发消极行为"""
+        if len(actions) < 3:
+            return ""
+        
+        consecutive_attacks = 0
+        
+        # 从最新的动作开始向前检查连续性
+        for i in range(len(actions) - 1, -1, -1):
+            action = actions[i]
+            action_name = action.get('action', '')
+            
+            if action_name == 'be_attacked':
+                consecutive_attacks += 1
+            else:
+                # 其他动作打断连续被攻击
+                break
+        
+        if consecutive_attacks >= 3:
+            return f"连续被攻击{consecutive_attacks}次"
+        return ""
+    
+    def _check_support_contact_risk(self, actions: List[Dict]) -> str:
+        """检查联系客服触发流失风险"""
+        for action in actions:
+            if action.get('action') == 'contact_support':
+                return "联系客服求助，可能遇到问题"
+        return ""
+    
+    def _check_uninstall_risk(self, actions: List[Dict]) -> str:
+        """检查卸载游戏触发流失风险"""
+        for action in actions:
+            if action.get('action') == 'uninstall_game':
+                return "执行卸载游戏操作"
+        return ""
+    
+    def _check_payment_behavior(self, actions: List[Dict]) -> str:
+        """检查充值行为积极表现"""
+        payment_actions = []
+        for action in actions:
+            action_name = action.get('action', '')
+            if action_name in ['make_payment', 'buy_monthly_card', 'buy_item']:
+                payment_actions.append(action_name)
+        
+        if payment_actions:
+            return f"充值消费行为：{', '.join(set(payment_actions))}"
+        return ""
+    
+    def _check_social_activity(self, actions: List[Dict]) -> str:
+        """检查社交活跃表现"""
+        social_actions = []
+        for action in actions:
+            action_name = action.get('action', '')
+            if action_name in ['join_family', 'add_friend', 'send_chat_message']:
+                social_actions.append(action_name)
+        
+        if social_actions:
+            return f"社交活跃行为：{', '.join(set(social_actions))}"
+        return ""
+    
+    def _check_achievement_behavior(self, actions: List[Dict]) -> str:
+        """检查游戏成就积极表现"""
+        achievement_actions = []
+        for action in actions:
+            action_name = action.get('action', '')
+            status = action.get('params', {}).get('status', '')
+            rarity = action.get('params', {}).get('rarity', '')
+            difficulty = action.get('params', {}).get('difficulty', '')
+            
+            # 成功的高难度或高价值行为
+            if (
+                (action_name == 'complete_dungeon' and status == 'success' and difficulty == 'hard') or
+                (action_name == 'recruit_hero' and rarity in ['rare', 'epic', 'legendary']) or
+                (action_name in ['upgrade_skill', 'upgrade_building'] and status == 'success')
+            ):
+                achievement_actions.append(f"{action_name}({status or rarity or difficulty})")
+        
+        if achievement_actions:
+            return f"游戏成就行为：{', '.join(achievement_actions)}"
+        return ""
+    
+    def _check_abnormal_frequency(self, actions: List[Dict]) -> str:
+        """检查异常高频操作"""
+        if len(actions) == 3:
+            # 检查是否为相同动作的高频重复
+            action_names = [a.get('action', '') for a in actions]
+            if len(set(action_names)) == 1 and action_names[0] not in ['login', 'logout']:
+                return f"高频重复操作：{action_names[0]} x3"
+        return ""
+    
+    def _check_asset_disposal_risk(self, actions: List[Dict]) -> str:
+        """检查资产处理风险"""
+        disposal_actions = []
+        for action in actions:
+            action_name = action.get('action', '')
+            if action_name in ['sell_item', 'cancel_auto_renew', 'post_account_for_sale']:
+                disposal_actions.append(action_name)
+        
+        if disposal_actions:
+            return f"资产处理行为：{', '.join(set(disposal_actions))}"
+        return ""
+    
+    def is_negative_behavior(self, action_name: str, simulator_instance) -> bool:
+        """判断单个动作是否为消极行为"""
+        # 基于PlayerBehaviorSimulator中定义的消极场景判断
+        return action_name in simulator_instance.negative_scenarios
+    
+    def get_emotion_type_from_scenarios(self, triggered_scenarios: List[Dict[str, str]]) -> str:
+        """根据触发的场景判断情绪类型"""
+        if not triggered_scenarios:
+            return "neutral"
+        
+        scenario_names = [s.get('scenario', '') for s in triggered_scenarios]
+        
+        # 定义场景优先级和对应的情绪类型
+        emotion_mapping = {
+            # 消极情绪场景（高优先级）
+            '连续失败触发消极情绪': 'negative',
+            '社交退出行为风险': 'negative', 
+            '连续被攻击消极行为': 'negative',
+            '客服求助流失风险': 'negative',
+            '游戏卸载流失风险': 'negative',
+            '资产处理风险': 'negative',
+            # 异常行为场景（中优先级）
+            '异常高频操作': 'abnormal',
+            # 积极情绪场景（低优先级）
+            '充值行为积极表现': 'positive',
+            '社交活跃表现': 'positive',
+            '游戏成就积极表现': 'positive'
+        }
+        
+        # 按优先级顺序检查场景
+        priority_order = ['negative', 'abnormal', 'positive']
+        
+        for emotion_type in priority_order:
+            for scenario_name in scenario_names:
+                if emotion_mapping.get(scenario_name) == emotion_type:
+                    return emotion_type
+        
+        return "neutral"
+    
+    def analyze_single_action_emotion(self, action: str, context: Dict[str, Any] = None) -> str:
+        """分析单个动作的情绪倾向（独立于序列分析）"""
+        context = context or {}
+        
+        # 定义单个动作的情绪映射
+        action_emotion_map = {
+            # 明确的消极动作
+            'click_exit_game_button': 'negative',
+            'cancel_auto_renew': 'negative',
+            'uninstall_game': 'negative',
+            'contact_support': 'negative',  # 通常表示遇到问题
+            'sell_item': 'negative',  # 可能表示资金紧张或准备离开
+            'clear_backpack': 'negative',  # 可能表示准备离开
+            'post_account_for_sale': 'negative',
+            'leave_family': 'negative',  # 离开家族
+            'remove_friend': 'negative',  # 删除好友
+            'be_attacked': 'negative',  # 被攻击
+            'lose_pvp': 'negative',  # PVP失败
+            
+            # 明确的积极动作
+            'make_payment': 'positive',
+            'buy_monthly_card': 'positive',
+            'buy_item': 'positive',
+            'receive_daily_reward': 'positive',
+            'receive_event_reward': 'positive',
+            'receive_praise': 'positive',
+            'be_invited_to_family': 'positive',
+            'add_friend': 'positive',
+            'join_family': 'positive',
+            
+            # 中性动作（大部分游戏动作）
+            'login': 'neutral',
+            'logout': 'neutral',
+            'enter_dungeon': 'neutral',
+            'attack_player': 'neutral',
+            'send_chat_message': 'neutral',
+            'receive_chat_message': 'neutral',
+            'recruit_hero': 'neutral',  # 需要根据结果判断
+            'complete_dungeon': 'neutral',  # 需要根据结果判断
+            'upgrade_skill': 'neutral',  # 需要根据结果判断
+            'upgrade_building': 'neutral'  # 需要根据结果判断
+        }
+        
+        return action_emotion_map.get(action, 'neutral')
 
     # --- 基础游戏行为检测 ---
 
@@ -57,7 +328,7 @@ class PlayerBehaviorRuleEngine:
 
     # --- 消极情绪相关检测 ---
 
-    def check_consecutive_dungeon_failures(self, actions: List[Dict], count: int = 3) -> List[Dict]:
+    def check_consecutive_dungeon_failures(self, actions: List[Dict], count: int = 2) -> List[Dict]:
         """规则: 短时间内连续记录到多次 complete_dungeon 且 status='fail'。"""
         failure_streak = []
         for action in actions:
@@ -69,7 +340,7 @@ class PlayerBehaviorRuleEngine:
                 failure_streak = []  # 任何其他动作都会打断连续性
         return []
 
-    def check_multiple_pvp_losses(self, actions: List[Dict], count: int = 3) -> List[Dict]:
+    def check_multiple_pvp_losses(self, actions: List[Dict], count: int = 2) -> List[Dict]:
         """规则: 短时间内记录到多次 lose_pvp 或 be_attacked (防守失败)。"""
         losses = [a for a in actions if a.get('action') in ['lose_pvp', 'be_attacked']]
         if len(losses) >= count:
