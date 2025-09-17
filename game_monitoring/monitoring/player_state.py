@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 
 class PlayerState:
@@ -15,6 +15,14 @@ class PlayerState:
         self.bot_confidence = 0.0
         self.bot_patterns = []
         self.last_updated = datetime.now()
+        
+        # 个性化推送相关属性
+        self.player_name: Optional[str] = None  # 玩家姓名
+        self.team_stamina: List[int] = [100, 100, 100, 100]  # 队伍体力，默认4个队伍
+        self.backpack_items: List[str] = []  # 背包道具列表
+        self.team_levels: List[int] = [1, 1, 1, 1]  # 阵容等级，默认4个队伍
+        self.skill_levels: List[int] = [1, 1, 1, 1]  # 技能等级，默认4个技能
+        self.reserve_troops: int = 0  # 预备兵数量
     
     def to_dict(self):
         return {
@@ -28,7 +36,14 @@ class PlayerState:
             "is_bot": self.is_bot,
             "bot_confidence": self.bot_confidence,
             "bot_patterns": self.bot_patterns,
-            "last_updated": self.last_updated.isoformat()
+            "last_updated": self.last_updated.isoformat(),
+            # 个性化推送相关属性
+            "player_name": self.player_name,
+            "team_stamina": self.team_stamina,
+            "backpack_items": self.backpack_items,
+            "team_levels": self.team_levels,
+            "skill_levels": self.skill_levels,
+            "reserve_troops": self.reserve_troops
         }
 
 
@@ -64,3 +79,25 @@ class PlayerStateManager:
     
     def get_player_state(self, player_id: str) -> PlayerState:
         return self.get_or_create_state(player_id)
+    
+    def update_player_attributes(self, player_id: str, player_name: str = None, 
+                               team_stamina: List[int] = None, backpack_items: List[str] = None,
+                               team_levels: List[int] = None, skill_levels: List[int] = None,
+                               reserve_troops: int = None, update_time: datetime = None):
+        """更新玩家的个性化推送相关属性"""
+        state = self.get_or_create_state(player_id)
+        
+        if player_name is not None:
+            state.player_name = player_name
+        if team_stamina is not None:
+            state.team_stamina = team_stamina
+        if backpack_items is not None:
+            state.backpack_items = backpack_items
+        if team_levels is not None:
+            state.team_levels = team_levels
+        if skill_levels is not None:
+            state.skill_levels = skill_levels
+        if reserve_troops is not None:
+            state.reserve_troops = reserve_troops
+            
+        state.last_updated = update_time or datetime.now()
