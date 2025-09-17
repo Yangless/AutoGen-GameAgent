@@ -1,3 +1,4 @@
+from pkgutil import extend_path
 from autogen_agentchat.teams import MagenticOneGroupChat
 from autogen_agentchat.ui import Console
 from config import doubao_client
@@ -11,9 +12,13 @@ from ..agents.intervention_agents import (
     create_engagement_agent,
     create_guidance_agent
 )
+from ..agents.military_order_agent import (
+    create_military_order_agent
+)
 from ..monitoring.behavior_monitor import BehaviorMonitor
 from typing import List
 import mlflow
+
 
 
 
@@ -34,6 +39,9 @@ class GameMonitoringTeam:
         self.engagement_agent = create_engagement_agent()
         self.guidance_agent = create_guidance_agent()
         
+        # 创建军令Agent
+        self.military_order_agent = create_military_order_agent()
+        
         # 创建团队
         self.analysis_team = MagenticOneGroupChat(
             [
@@ -43,6 +51,7 @@ class GameMonitoringTeam:
                 self.behavioral_analyst_agent,
                 self.engagement_agent,
                 self.guidance_agent,
+                self.military_order_agent,
             ],
             model_client=self.model_client
         )
@@ -68,4 +77,27 @@ class GameMonitoringTeam:
         print("\n" + "="*25 + " 团队实时动态 " + "="*23)
         
         await Console(self.analysis_team.run_stream(task=task))
+        print("="*62 + "\n")
+    
+    async def generate_batch_military_orders(self, commander_order: str = None):
+        """使用军令Agent批量生成多玩家个性化军令"""
+        print(f"\n🎯 启动军令Agent，批量生成个性化军令...")
+        
+        task = f"""
+        **军令生成任务：批量为多个玩家生成个性化军令**
+
+        **指挥官总军令:**
+        {commander_order if commander_order else "使用默认军令配置"}
+
+        **你的任务:**
+        1. 使用 `generate_batch_military_orders` 工具批量生成所有玩家的个性化军令
+        2. 确保每个玩家的军令都基于其具体属性进行个性化定制
+        3. 汇报生成结果，包括为哪些玩家生成了军令以及主要特点
+        4. 不要在回复中透露军令的具体内容，只汇报生成状态和玩家能力摘要
+
+        请立即开始执行批量军令生成任务。
+        """
+        
+        print("\n" + "="*25 + " 军令生成动态 " + "="*23)
+        await Console(self.military_order_agent.run_stream(task=task))
         print("="*62 + "\n")
