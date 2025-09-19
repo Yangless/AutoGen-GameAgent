@@ -2,6 +2,12 @@
 
 这是一个基于 Streamlit 的交互式前端界面，用于演示和调试游戏玩家行为监控系统。
 
+## Streamlit 应用
+python -m streamlit run streamlit_dashboard.py --server.port=8502 
+
+## mlflow ui 使用
+mlflow ui
+
 ## 📋 功能特性
 
 ### 🏗️ 三栏布局设计
