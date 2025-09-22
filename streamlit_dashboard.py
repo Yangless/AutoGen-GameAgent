@@ -524,6 +524,80 @@ async def trigger_behavior_and_analysis(player_id: str, behavior_type: str, spec
     else:
         add_agent_log(f"📊 行为已记录，当前负面行为计数: {st.session_state.player_negative_counts.get(player_id, 0)}") # CHANGED
 
+def run_batch_generation(selected_players: list, commander_order: str):
+    """后台线程：为选中的玩家批量生成个性化军令，并实时更新页面状态"""
+    try:
+        from game_monitoring.context import get_player_info
+        from game_monitoring.tools.military_order_tool import generate_military_order_with_llm
+        import json
+        from datetime import datetime
+        import streamlit as st
+
+        # 初始化批量结果容器
+        if 'batch_generated_orders' not in st.session_state or st.session_state.batch_generated_orders is None:
+            st.session_state.batch_generated_orders = []
+        if 'batch_generation_processed' not in st.session_state:
+            st.session_state.batch_generation_processed = 0
+
+        # 逐个玩家生成军令
+        for player_name in selected_players:
+            info = get_player_info(player_name)
+            if not info:
+                st.session_state.batch_generated_orders.append({
+                    "player_name": player_name,
+                    "player_id": "unknown",
+                    "military_order": "",
+                    "teams_info": [],
+                    "error": f"未找到玩家信息: {player_name}",
+                    "timestamp": datetime.now()
+                })
+                st.session_state.batch_generation_processed += 1
+                continue
+
+            try:
+                result_str = generate_military_order_with_llm(
+                    player_name=info.get("player_name", player_name),
+                    player_id=player_name.lower().replace(" ", "_"),
+                    team_stamina=info.get("team_stamina"),
+                    backpack_items=info.get("backpack_items"),
+                    team_levels=info.get("team_levels"),
+                    skill_levels=info.get("skill_levels"),
+                    reserve_troops=info.get("reserve_troops", 0),
+                    commander_order=commander_order
+                )
+                result = json.loads(result_str)
+
+                # 适配UI字段：将 team_analysis 映射为 teams_info 以便展示
+                st.session_state.batch_generated_orders.append({
+                    "player_name": result.get("player_name", player_name),
+                    "player_id": result.get("player_id", player_name.lower().replace(" ", "_")),
+                    "military_order": result.get("military_order", ""),
+                    "teams_info": result.get("team_analysis", []),
+                    "timestamp": datetime.now()
+                })
+            except Exception as e:
+                st.session_state.batch_generated_orders.append({
+                    "player_name": player_name,
+                    "player_id": player_name.lower().replace(" ", "_"),
+                    "military_order": "",
+                    "teams_info": [],
+                    "error": str(e),
+                    "timestamp": datetime.now()
+                })
+                st.session_state.batch_generation_error = str(e)
+            finally:
+                st.session_state.batch_generation_processed += 1
+
+        # 标记任务完成
+        st.session_state.batch_generation_in_progress = False
+    except Exception as e:
+        # 兜底错误处理
+        try:
+            st.session_state.batch_generation_error = f"批量生成线程异常: {str(e)}"
+            st.session_state.batch_generation_in_progress = False
+        except Exception:
+            pass
+
 # 主界面
 def main():
     # --- 在这里添加自动刷新组件 ---
@@ -817,12 +891,12 @@ def main():
                 st.metric("体力耗尽次数", st.session_state.stamina_exhaustion_count)
                 st.metric("日志条数", len(st.session_state.stamina_guide_logs))
                 
-                # 重置计数器
-                if st.button("🔄 重置计数", key="reset_stamina_tab_counter", use_container_width=True):
-                    st.session_state.stamina_exhaustion_count = 0
-                    add_stamina_guide_log("🔄 重置体力计数器")
-                    st.success("计数器已重置！")
-                    st.rerun()
+                # # 重置计数器
+                # if st.button("🔄 重置计数", key="reset_stamina_tab_counter", use_container_width=True):
+                #     st.session_state.stamina_exhaustion_count = 0
+                #     add_stamina_guide_log("🔄 重置体力计数器")
+                #     st.success("计数器已重置！")
+                #     st.rerun()
         
         with tab4:
             # 军令操作标签页内容
@@ -1224,8 +1298,8 @@ def main():
                                                     # add_stamina_guide_log("✅ Agent创建成功")
                                                     
                                                     # 构建引导请求消息
-                                                    # guide_message = f"玩家{st.session_state.current_player_id}体力耗尽次数达到阈值"
-                                                    guide_message = "玩家孤独的凤凰战士体力耗尽次数达到阈值"
+                                                    guide_message = f"玩家{st.session_state.current_player_id}体力耗尽次数达到阈值"
+                                                    # guide_message = "玩家孤独的凤凰战士体力耗尽次数达到阈值"
                                                     add_stamina_guide_log(f"📤 发送引导消息: {guide_message}")
                                                     
                                                     # 使用run_stream方法进行流式处理
