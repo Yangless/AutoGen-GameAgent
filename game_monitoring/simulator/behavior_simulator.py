@@ -35,16 +35,24 @@ class PlayerBehaviorRuleEngine:
             ('社交活跃表现', self._check_social_activity, recent_actions),
             ('游戏成就积极表现', self._check_achievement_behavior, recent_actions),
             ('异常高频操作', self._check_abnormal_frequency, recent_actions),
-            ('资产处理风险', self._check_asset_disposal_risk, recent_actions)
+            ('资产处理风险', self._check_asset_disposal_risk, recent_actions),
+            ('体力耗尽引导触发', self._check_stamina_exhaustion_trigger, actions)  # 使用完整动作序列而不是recent_actions
         ]
         
         for scenario_name, rule_func, action_data in rules_to_check:
             trigger_result = rule_func(action_data)
             if trigger_result:
+                # 特殊处理体力耗尽场景的描述
+                if scenario_name == '体力耗尽引导触发':
+                    description = trigger_result if isinstance(trigger_result, str) else f'检测到玩家体力耗尽次数达到阈值，需要引导'
+                else:
+                    description = trigger_result if isinstance(trigger_result, str) else f'规则引擎检测到{scenario_name}相关行为模式'
+                
                 triggered_scenarios.append({
                     'scenario': scenario_name,
                     'player_id': player_id,
-                    'trigger_reason': trigger_result if isinstance(trigger_result, str) else f'规则引擎检测到{scenario_name}相关行为模式',
+                    'trigger_reason': description,
+                    'description': description,  # 添加description字段
                     'trigger_actions': [a.get('action', '') for a in action_data]
                 })
                 
@@ -422,6 +430,31 @@ class PlayerBehaviorRuleEngine:
             if len(actions_in_window) > rate_threshold:
                 return actions_in_window
         return []
+        
+    def check_stamina_exhaustion(self, actions: List[Dict], threshold: int = 3) -> List[Dict]:
+        """规则: 检测玩家体力耗尽事件，当累计次数达到阈值时触发"""
+        stamina_exhaustion_actions = []
+        
+        # 检测体力耗尽相关的动作
+        stamina_keywords = ['stamina_exhausted', 'attempt_enter_dungeon_no_stamina', '体力耗尽', '体力不足']
+        
+        for action in actions:
+            action_name = action.get('action', '').lower()
+            if any(keyword in action_name for keyword in stamina_keywords):
+                stamina_exhaustion_actions.append(action)
+        
+        # 如果体力耗尽次数达到阈值，返回所有相关动作
+        if len(stamina_exhaustion_actions) >= threshold:
+            return stamina_exhaustion_actions
+        
+        return []
+    
+    def _check_stamina_exhaustion_trigger(self, actions: List[Dict]) -> str:
+        """检查体力耗尽触发条件，用于规则引擎调用"""
+        stamina_actions = self.check_stamina_exhaustion(actions, threshold=3)
+        if stamina_actions:
+            return f"检测到{len(stamina_actions)}次体力耗尽事件，已达到引导阈值"
+        return ""
 
 class PlayerBehaviorSimulator:
     def __init__(self):

@@ -2,6 +2,9 @@
 
 提供全局共享的 monitor 和 player_state_manager 实例，
 供各个工具函数访问真实的行为监控和状态管理功能。
+
+后续接口获取数据
+
 """
 
 from typing import Optional, Dict, Any, List
@@ -22,7 +25,15 @@ _players_info: Dict[str, Dict[str, Any]] = {
         "skill_levels": [10, 8, 6, 1],
         "reserve_troops": 40000,
         "player_type": "高级玩家",
-        "combat_preference": "主力攻城"
+        "combat_preference": "主力攻城",
+        "current_stamina": 90,
+        "max_stamina": 120,
+        "vip_level": 5,
+        "stamina_items": [
+            {"item_id": "stamina_potion_small", "name": "小体力药水", "count": 8, "recovery_amount": 20, "expire_time": "2024-12-25T23:59:59"},
+            {"item_id": "stamina_potion_medium", "name": "中体力药水", "count": 3, "recovery_amount": 50, "expire_time": "2024-12-30T23:59:59"},
+            {"item_id": "stamina_potion_large", "name": "大体力药水", "count": 2, "recovery_amount": 100, "expire_time": "2024-12-22T23:59:59"}
+        ]
     },
     "叶良辰": {
         "player_name": "叶良辰",
@@ -32,9 +43,16 @@ _players_info: Dict[str, Dict[str, Any]] = {
         "skill_levels": [10, 8, 6, 1],
         "reserve_troops": 50000,
         "player_type": "中级玩家",
-        "combat_preference": "支援作战"
+        "combat_preference": "支援作战",
+        "current_stamina": 30,
+        "max_stamina": 100,
+        "vip_level": 3,
+        "stamina_items": [
+            {"item_id": "stamina_potion_small", "name": "小体力药水", "count": 5, "recovery_amount": 20, "expire_time": "2024-12-28T23:59:59"},
+            {"item_id": "energy_drink", "name": "能量饮料", "count": 1, "recovery_amount": 80, "expire_time": "2024-12-21T23:59:59"}
+        ]
     },
-        "孤独的凤凰战士": {
+    "孤独的凤凰战士": {
         "player_name": "孤独的凤凰战士",
         "team_stamina": [25, 60, 90, 90],
         "backpack_items": ["1个小面包", "1个大面包"],
@@ -42,7 +60,14 @@ _players_info: Dict[str, Dict[str, Any]] = {
         "skill_levels": [6, 4, 2, 1],
         "reserve_troops": 10000,
         "player_type": "初级玩家",
-        "combat_preference": "支援作战"
+        "combat_preference": "支援作战",
+        "current_stamina": 10,
+        "max_stamina": 80,
+        "vip_level": 1,
+        "stamina_items": [
+            {"item_id": "stamina_potion_small", "name": "小体力药水", "count": 2, "recovery_amount": 20, "expire_time": "2024-12-26T23:59:59"},
+            {"item_id": "stamina_potion_medium", "name": "中体力药水", "count": 1, "recovery_amount": 50, "expire_time": "2024-12-23T23:59:59"}
+        ]
     }
 }
 

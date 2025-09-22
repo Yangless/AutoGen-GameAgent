@@ -35,7 +35,10 @@ class PlayerActionDefinitions:
             "enhance_equipment(item_id, status)",
             "dismantle_equipment(item_id)",
             "unlock_achievement(achievement_id)",
-            "unlock_map(map_id)"
+            "unlock_map(map_id)",
+            "stamina_exhausted(activity_type)",
+            "attempt_enter_dungeon_no_stamina(dungeon_id)",
+
         ]
 
         # 社交动作 (Social Actions)

@@ -217,7 +217,7 @@ if 'monitor' not in st.session_state: # ADDED: 为 monitor 对象在 session_sta
 if 'player_state_manager' not in st.session_state: # ADDED: 为 player_state_manager 对象在 session_state 中占位
     st.session_state.player_state_manager = None
 if 'current_player_id' not in st.session_state:
-    st.session_state.current_player_id = "player_001"
+    st.session_state.current_player_id = "孤独的凤凰战士"
 if 'behavior_logs' not in st.session_state:
     st.session_state.behavior_logs = []
 if 'agent_logs' not in st.session_state:
@@ -234,6 +234,9 @@ if 'agent_analysis_logs' not in st.session_state:
     st.session_state.agent_analysis_logs = []
 if 'player_negative_counts' not in st.session_state:
     st.session_state.player_negative_counts = {}
+# 体力引导结果列表初始化
+if 'stamina_guidance_results' not in st.session_state:
+    st.session_state.stamina_guidance_results = []
 # 新增原子动作相关状态
 if 'action_definitions' not in st.session_state:
     st.session_state.action_definitions = PlayerActionDefinitions()
@@ -265,6 +268,36 @@ def run_async(coro):
         asyncio.set_event_loop(loop)
     
     return loop.run_until_complete(coro)
+
+def add_stamina_guide_log(message):
+    """添加体力引导日志"""
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    formatted_log = f"[{timestamp}] {message}"
+    
+    if 'stamina_guide_logs' not in st.session_state:
+        st.session_state.stamina_guide_logs = []
+    
+    st.session_state.stamina_guide_logs.append(formatted_log)
+    
+    # 保持最新的50条日志
+    if len(st.session_state.stamina_guide_logs) > 50:
+        st.session_state.stamina_guide_logs = st.session_state.stamina_guide_logs[-50:]
+
+def simulate_stamina_exhaustion_scenario():
+    """模拟体力耗尽场景"""
+    add_stamina_guide_log("🧪 开始模拟体力耗尽场景")
+    add_stamina_guide_log("⚡ 玩家体力值: 100 -> 50")
+    add_stamina_guide_log("⚡ 玩家体力值: 50 -> 10")
+    add_stamina_guide_log("⚡ 玩家体力值: 10 -> 0")
+    add_stamina_guide_log("🚨 检测到体力耗尽，触发引导Agent")
+    add_stamina_guide_log("💊 生成体力恢复建议弹窗")
+    
+    # 增加体力耗尽计数
+    if 'stamina_exhaustion_count' not in st.session_state:
+        st.session_state.stamina_exhaustion_count = 0
+    st.session_state.stamina_exhaustion_count += 1
+
+
 
 # 初始化系统
 @st.cache_resource
@@ -660,8 +693,8 @@ def main():
     with col2:
         st.markdown('<h2 class="section-header">🤖 Agent 决策流程</h2>', unsafe_allow_html=True)
         
-        # 创建两个标签页：基础日志和Agent分析日志
-        tab1, tab2 = st.tabs(["📋 基础日志", "🧠 Agent团队分析"])
+        # 创建四个标签页：基础日志、Agent分析日志、体力引导Agent和军令操作
+        tab1, tab2, tab3, tab4 = st.tabs(["📋 基础日志", "🧠 Agent团队分析", "⚡ 体力引导Agent", "⚔️ 军令操作"])
         
         with tab1:
             # 基础系统日志 - 显示所有日志，不进行过滤
@@ -724,6 +757,311 @@ def main():
             else:
                 st.info("💭 等待Agent团队分析...\n\n当检测到玩家负面行为达到阈值时，系统将自动触发多智能体团队分析，所有分析过程将在此处实时显示。")
         
+        with tab3:
+            # 体力引导Agent标签页内容
+            st.markdown("**⚡ 体力引导Agent监控**")
+            
+            # 初始化体力相关状态
+            if 'stamina_exhaustion_count' not in st.session_state:
+                st.session_state.stamina_exhaustion_count = 0
+            if 'stamina_guide_logs' not in st.session_state:
+                st.session_state.stamina_guide_logs = []
+            
+            # 创建两列布局
+            col_left, col_right = st.columns([2, 1])
+            
+            with col_left:
+                # 体力引导日志显示
+                st.markdown("**📋 体力引导日志**")
+                
+                # 日志控制按钮
+                btn_col1, btn_col2, btn_col3 = st.columns(3)
+                with btn_col1:
+                    if st.button("🔄 刷新", key="refresh_stamina_tab_logs"):
+                        st.rerun()
+                with btn_col2:
+                    if st.button("🗑️ 清空", key="clear_stamina_tab_logs"):
+                        st.session_state.stamina_guide_logs = []
+                        st.rerun()
+
+                
+                # 显示体力引导日志
+                if st.session_state.stamina_guide_logs:
+                    log_container_html = "<div class='log-container' style='height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 5px; padding: 10px; background-color: #f9f9f9;'>" + \
+                        "".join([f"<div class='agent-log'>{log}</div>" for log in st.session_state.stamina_guide_logs]) + \
+                        "</div>"
+                    st.markdown(log_container_html, unsafe_allow_html=True)
+                else:
+                    st.info("💡 暂无体力引导日志，请执行体力相关动作。")
+                
+                # 体力引导结果展示
+                st.markdown("**🎯 个性化引导结果**")
+                if 'stamina_guidance_results' in st.session_state and st.session_state.stamina_guidance_results:
+                    # 显示最新的引导结果
+                    for i, result in enumerate(reversed(st.session_state.stamina_guidance_results[-5:]), 1):
+                        status_icon = "✅" if result['status'] == 'success' else "❌"
+                        with st.expander(f"{status_icon} {result['player_id']} - {result['timestamp']}", expanded=(i==1)):
+                            st.markdown(f"**触发原因:** {result['trigger_reason']}")
+                            st.markdown(f"**引导内容:**")
+                            if result['status'] == 'success':
+                                st.success(result['guidance_content'])
+                            else:
+                                st.error(result['guidance_content'])
+                            st.markdown(f"**状态:** {result['status']}")
+                else:
+                    st.info("💡 暂无个性化引导结果，当体力耗尽次数达到阈值时将自动生成。")
+            
+            with col_right:
+                # 体力状态和统计
+                st.markdown("**📊 体力统计**")
+                st.metric("体力耗尽次数", st.session_state.stamina_exhaustion_count)
+                st.metric("日志条数", len(st.session_state.stamina_guide_logs))
+                
+                # 重置计数器
+                if st.button("🔄 重置计数", key="reset_stamina_tab_counter", use_container_width=True):
+                    st.session_state.stamina_exhaustion_count = 0
+                    add_stamina_guide_log("🔄 重置体力计数器")
+                    st.success("计数器已重置！")
+                    st.rerun()
+        
+        with tab4:
+            # 军令操作标签页内容
+            st.markdown("**⚔️ 军令操作中心**")
+            
+            # 多玩家个性化军令生成功能
+            st.subheader("⚔️ 多玩家个性化军令生成")
+            with st.expander("批量生成军令", expanded=False):
+                # 指挥官总军令输入
+                st.markdown("### 📋 指挥官总军令")
+                commander_order = st.text_area(
+                    "输入指挥官总军令：",
+                    value="""事件：今天（9月15号）早上10点，听信件指挥进行攻城！
+配置：请每人至少派出4支部队，第1队主力需要能打12级地，第2队需要能打11级地，第3队需要能打8级地，第4队需要能打6级地；能打12级直接去前线（752，613），注意兵种克属，派遣过去并驻守城池xx，城池最大可募兵三万，队伍...
+介绍：集结等建好后发起，将军雕像S（已建成）使用【集结】或【派遣】进行快速行军前往，目不消耗体力和十气。""",
+                    height=200,
+                    key="commander_order_input_tab4"
+                )
+                
+                # 玩家选择
+                st.markdown("### 👥 选择玩家")
+                from game_monitoring.context import get_all_player_names
+                available_players = get_all_player_names()
+                
+                if available_players:
+                    selected_players = st.multiselect(
+                        "选择要生成军令的玩家：",
+                        options=available_players,
+                        default=available_players,
+                        key="selected_players_tab4"
+                    )
+                    
+                    # 批量生成军令按钮
+                    if st.button("🎯 批量生成个性化军令", key="generate_batch_military_orders_tab4"):
+                        if selected_players and commander_order.strip():
+                            if st.session_state.batch_generation_in_progress:
+                                st.warning("⚠️ 另一项批量生成任务正在进行中，请稍候...")
+                            else:
+                                from game_monitoring.context import set_commander_order
+                                # 写入指挥官总军令
+                                set_commander_order(commander_order.strip())
+                                
+                                # 初始化批量生成状态
+                                st.session_state.batch_generated_orders = []
+                                st.session_state.batch_generation_in_progress = True
+                                st.session_state.batch_generation_total = len(selected_players)
+                                st.session_state.batch_generation_processed = 0
+                                st.session_state.batch_generation_error = None
+                                
+                                # 启动批量生成线程
+                                import threading
+                                t = threading.Thread(target=run_batch_generation, args=(list(selected_players), commander_order.strip()), daemon=True)
+                                try:
+                                    if add_script_run_ctx is not None:
+                                        add_script_run_ctx(t)
+                                except Exception:
+                                    pass
+                                t.start()
+                                st.info(f"⏳ 已开始批量生成 {len(selected_players)} 名玩家的个性化军令，结果将实时显示在下方。")
+                                st.rerun()
+                        else:
+                            if not selected_players:
+                                st.warning("⚠️ 请选择至少一个玩家")
+                            if not commander_order.strip():
+                                st.warning("⚠️ 请输入指挥官总军令")
+                else:
+                    st.info("ℹ️ 暂无可用玩家，请先在上下文中添加玩家信息")
+            
+            # 个性化军令预览功能
+            st.subheader("⚔️ 个性化军令预览")
+            
+            # 检查是否有批量生成的军令结果
+            if st.session_state.batch_generated_orders:
+                st.markdown("### 📋 批量生成的军令预览")
+                
+                for i, order in enumerate(st.session_state.batch_generated_orders):
+                    player_name = order.get("player_name", "未知玩家")
+                    player_id = order.get("player_id", "unknown")
+                    
+                    with st.expander(f"👤 {player_name} ({player_id})", expanded=False):
+                        st.markdown("### 📜 军令内容")
+                        military_order_content = order.get("military_order", "军令内容未找到")
+                        st.markdown(f"```\n{military_order_content}\n```")
+                        
+                        # 显示玩家队伍信息
+                        teams_info = order.get("teams_info", [])
+                        if teams_info:
+                            st.markdown("### 👥 队伍信息")
+                            for team in teams_info:
+                                st.write(f"• **队伍{team.get('team_number', 'N/A')}**: {team.get('level', 'N/A')}级, 体力{team.get('stamina', 'N/A')}%, 能力: {team.get('capability', 'N/A')}")
+                            st.write(f"  任务安排: {team.get('assignment', 'N/A')}")
+                
+                # 清除批量结果按钮
+                if st.button("🗑️ 清除批量结果", key="clear_batch_results_tab4"):
+                    st.session_state.batch_generated_orders = None
+                    st.session_state.batch_generation_in_progress = False
+                    st.session_state.batch_generation_total = 0
+                    st.session_state.batch_generation_processed = 0
+                    st.session_state.batch_generation_error = None
+                    st.rerun()
+            
+            # 检查是否有单个玩家生成的军令结果
+            elif st.session_state.single_generated_order:
+                st.markdown("### 👤 单个玩家军令预览")
+                
+                order = st.session_state.single_generated_order
+                player_name = order.get("player_name", "未知玩家")
+                player_id = order.get("player_id", "unknown")
+                
+                st.markdown(f"**玩家**: {player_name} ({player_id})")
+                
+                # 显示军令内容
+                st.markdown("### 📜 军令内容")
+                military_order_content = order.get("military_order", "军令内容未找到")
+                st.markdown(f"```\n{military_order_content}\n```")
+                
+                # 清除单个结果按钮
+                if st.button("🗑️ 清除单个军令", key="clear_single_result_tab4"):
+                    st.session_state.single_generated_order = None
+                    st.rerun()
+            
+            else:
+                st.info("💡 暂无生成的军令，请先生成批量军令或单个玩家军令。")
+            
+            # 单个玩家军令生成预览
+            with st.expander("单个玩家军令生成", expanded=False):
+                if st.button("🎯 生成当前玩家军令预览", key="generate_single_military_order_preview_tab4"):
+                    if player_state_manager:
+                        from game_monitoring.tools.military_order_tool import generate_personalized_military_order
+                        
+                        # 获取玩家状态
+                        player_state = player_state_manager.get_player_state(st.session_state.current_player_id)
+                        
+                        # 生成军令
+                        military_order = generate_personalized_military_order(
+                            player_id=st.session_state.current_player_id,
+                            player_name=player_state.player_name or "勇士",
+                            team_stamina=player_state.team_stamina or 50,
+                            backpack_items=player_state.backpack_items or [],
+                            team_levels=player_state.team_levels or {},
+                            skill_levels=player_state.skill_levels or {},
+                            reserve_troops=player_state.reserve_troops or 0
+                        )
+                        
+                        # 存储单个玩家军令到session_state
+                        st.session_state.single_generated_order = {
+                            "player_id": st.session_state.current_player_id,
+                            "player_name": player_state.player_name or "勇士",
+                            "military_order": military_order,
+                            "timestamp": datetime.now()
+                        }
+                        # 清除批量军令结果（优先显示单个结果）
+                        st.session_state.batch_generated_orders = None
+                        
+                        st.success(f"✅ 已生成玩家 {player_state.player_name or '勇士'} 的个性化军令！军令预览将自动显示在下方")
+                        add_agent_log(f"🎯 已生成玩家 {st.session_state.current_player_id} 的个性化军令预览")
+                        # 触发页面刷新以显示预览
+                        st.rerun()
+                    else:
+                        st.error("玩家状态管理器未初始化")
+            
+            # 发送军令功能
+            st.subheader("📤 发送军令")
+            with st.expander("发送军令给玩家", expanded=False):
+                st.markdown("### 选择发送方式")
+                
+                # 如果有批量生成的军令，提供批量发送选项
+                if st.session_state.batch_generated_orders:
+                    st.markdown("#### 📋 批量发送军令")
+                    if st.button("📤 发送所有批量生成的军令", key="send_batch_military_orders_tab4"):
+                        from game_monitoring.tools.military_order_tool import send_military_order
+                        
+                        success_count = 0
+                        total_count = len(st.session_state.batch_generated_orders)
+                        
+                        for order in st.session_state.batch_generated_orders:
+                            player_id = order.get("player_id", "unknown")
+                            player_name = order.get("player_name", "未知玩家")
+                            military_order = order.get("military_order", "")
+                            
+                            if military_order:
+                                try:
+                                    result_string = send_military_order(player_id, military_order)
+                                    result_dict = json.loads(result_string)
+                                    
+                                    if result_dict.get("status") == "success":
+                                        success_count += 1
+                                        add_agent_log(f"✔️ 成功发送军令给 {player_name}")
+                                    else:
+                                        add_agent_log(f"❌ 发送军令给 {player_name} 失败: {result_dict.get('message', '未知错误')}")
+                                except Exception as e:
+                                    add_agent_log(f"❌ 发送军令给 {player_name} 异常: {str(e)}")
+                        
+                        if success_count == total_count:
+                            st.success(f"✅ 成功发送所有 {total_count} 份军令！")
+                        elif success_count > 0:
+                            st.warning(f"⚠️ 成功发送 {success_count}/{total_count} 份军令")
+                        else:
+                            st.error(f"❌ 所有军令发送失败")
+                    
+                    st.markdown("---")
+                
+                # 单个玩家发送军令
+                st.markdown("#### 👤 单个玩家发送军令")
+                if st.button("📤 发送当前玩家军令", key="send_single_military_order_tab4"):
+                    if player_state_manager:
+                        from game_monitoring.tools.military_order_tool import generate_personalized_military_order, send_military_order
+                        
+                        # 获取玩家状态
+                        player_state = player_state_manager.get_player_state(st.session_state.current_player_id)
+                        
+                        # 生成军令
+                        military_order = generate_personalized_military_order(
+                            player_id=st.session_state.current_player_id,
+                            player_name=player_state.player_name or "勇士",
+                            team_stamina=player_state.team_stamina or 50,
+                            backpack_items=player_state.backpack_items or [],
+                            team_levels=player_state.team_levels or {},
+                            skill_levels=player_state.skill_levels or {},
+                            reserve_troops=player_state.reserve_troops or 0
+                        )
+                        
+                        # 发送军令
+                        try:
+                            result_string = send_military_order(st.session_state.current_player_id, military_order)
+                            result_dict = json.loads(result_string)
+                            
+                            if result_dict.get("status") == "success":
+                                st.success(f"✅ 成功发送军令给 {player_state.player_name or '勇士'}！")
+                                add_agent_log(f"✔️ 成功发送军令给玩家 {st.session_state.current_player_id}")
+                            else:
+                                st.error(f"❌ 发送失败: {result_dict.get('message', '未知错误')}")
+                                add_agent_log(f"❌ 发送军令失败: {result_dict.get('message', '未知错误')}")
+                        except Exception as e:
+                            st.error(f"❌ 发送异常: {str(e)}")
+                            add_agent_log(f"❌ 发送军令异常: {str(e)}")
+                    else:
+                        st.error("玩家状态管理器未初始化")
+        
         # 系统状态信息
         st.subheader("📈 系统状态")
         # CHANGED: 直接使用从 session_state 获取的 monitor
@@ -766,316 +1104,10 @@ def main():
     with col3:
         st.markdown('<h2 class="section-header">🎯 原子动作界面</h2>', unsafe_allow_html=True)
         
-        # 添加多玩家军令生成功能
-        st.subheader("⚔️ 多玩家个性化军令生成")
-        with st.expander("批量生成军令", expanded=False):
-            # 指挥官总军令输入
-            st.markdown("### 📋 指挥官总军令")
-            commander_order = st.text_area(
-                "输入指挥官总军令：",
-                value="""事件：今天（9月15号）早上10点，听信件指挥进行攻城！
-配置：请每人至少派出4支部队，第1队主力需要能打12级地，第2队需要能打11级地，第3队需要能打8级地，第4队需要能打6级地；能打12级直接去前线（752，613），注意兵种克属，派遣过去并驻守城池xx，城池最大可募兵三万，队伍重伤后可原地花费铜币募兵，不要回去，加油守住这个城池。能打11级的队伍如果是国家队伍的话，也可以酌情考虑派往前线，若非国家队，提前派遣部队至将军雕像（732，767），不列颠文明的队伍到城池附近，提前转化为器械部队；需提醒一下在打城前将派遣的队伍进行再次分类，为精锐攻城，和拆耐久部分；其余队伍作为攻城拆迁队，在主力将城池精锐部队耗完后，发起攻城，拆除城池耐久。
-介绍：集结等建好后发起，将军雕像S（已建成）使用【集结】或【派遣】进行快速行军前往，目不消耗体力和十气。""",
-                height=200,
-                key="commander_order_input"
-            )
-            
-            # 玩家选择
-            st.markdown("### 👥 选择玩家")
-            from game_monitoring.context import get_all_player_names
-            available_players = get_all_player_names()
-            
-            if available_players:
-                selected_players = st.multiselect(
-                    "选择要生成军令的玩家：",
-                    options=available_players,
-                    default=available_players,
-                    key="selected_players"
-                )
-                
-                # 批量生成军令按钮（改为逐个生成，实时写入结果）
-                if st.button("🎯 批量生成个性化军令", key="generate_batch_military_orders"):
-                    if selected_players and commander_order.strip():
-                        if st.session_state.batch_generation_in_progress:
-                            st.warning("⚠️ 另一项批量生成任务正在进行中，请稍候...")
-                        else:
-                            from game_monitoring.context import set_commander_order
-                            # 写入指挥官总军令
-                            set_commander_order(commander_order.strip())
-                            
-                            # 初始化批量生成状态
-                            st.session_state.batch_generated_orders = []
-                            st.session_state.single_generated_order = None
-                            st.session_state.batch_generation_in_progress = True
-                            st.session_state.batch_generation_total = len(selected_players)
-                            st.session_state.batch_generation_processed = 0
-                            st.session_state.batch_generation_error = None
-                            
-                            # 后台线程逐个玩家生成，并实时写入结果
-                            def run_batch_generation(selected_players_copy, commander_order_text):
-                                try:
-                                    import json as _json
-                                    import threading as _t  # 仅保证本函数内部安全引用
-                                    from game_monitoring.tools.military_order_tool import generate_military_order_with_llm
-                                    from game_monitoring.context import get_players_info
-                                    # 确保线程中访问的会话状态键已初始化（防御性处理）
-                                    if 'batch_generation_processed' not in st.session_state:
-                                        st.session_state.batch_generation_processed = 0
-                                    if 'batch_generated_orders' not in st.session_state or st.session_state.batch_generated_orders is None:
-                                        st.session_state.batch_generated_orders = []
-                                    if 'batch_generation_in_progress' not in st.session_state:
-                                        st.session_state.batch_generation_in_progress = True
-                                    if 'batch_generation_total' not in st.session_state:
-                                        st.session_state.batch_generation_total = len(selected_players_copy)
-                                    if 'batch_generation_error' not in st.session_state:
-                                        st.session_state.batch_generation_error = None
-                                    players_info = get_players_info()
-                                    players_info = get_players_info()
-                                    for p_name in selected_players_copy:
-                                        info = players_info.get(p_name)
-                                        if not info:
-                                            st.session_state.batch_generation_processed += 1
-                                            continue
-                                        try:
-                                            result_json = generate_military_order_with_llm(
-                                                player_name=info.get("player_name", p_name),
-                                                player_id=p_name.lower().replace(" ", "_"),
-                                                team_stamina=info.get("team_stamina"),
-                                                backpack_items=info.get("backpack_items"),
-                                                team_levels=info.get("team_levels"),
-                                                skill_levels=info.get("skill_levels"),
-                                                reserve_troops=info.get("reserve_troops", 0),
-                                                commander_order=commander_order_text
-                                            )
-                                            data = _json.loads(result_json)
-                                            # 保障列表存在
-                                            if st.session_state.batch_generated_orders is None:
-                                                st.session_state.batch_generated_orders = []
-                                            st.session_state.batch_generated_orders.append({
-                                                "player_id": data.get("player_id", p_name.lower().replace(" ", "_")),
-                                                "player_name": data.get("player_name", p_name),
-                                                "military_order": data.get("military_order", ""),
-                                                "team_analysis": data.get("team_analysis", [])
-                                            })
-                                        except Exception as e:
-                                            st.session_state.batch_generation_error = str(e)
-                                        finally:
-                                            st.session_state.batch_generation_processed += 1
-                                finally:
-                                    st.session_state.batch_generation_in_progress = False
-                            
-                            import threading
-                            t = threading.Thread(target=run_batch_generation, args=(list(selected_players), commander_order.strip()), daemon=True)
-                            # 关键：为线程附加 ScriptRunContext，允许在线程中安全访问 st.session_state
-                            try:
-                                if add_script_run_ctx is not None:
-                                    add_script_run_ctx(t)
-                            except Exception:
-                                pass
-                            t.start()
-                            st.info(f"⏳ 已开始批量生成 {len(selected_players)} 名玩家的个性化军令，结果将实时显示在下方。")
-                            st.rerun()
-                    else:
-                        if not selected_players:
-                            st.warning("⚠️ 请选择至少一个玩家")
-                        if not commander_order.strip():
-                            st.warning("⚠️ 请输入指挥官总军令")
-            else:
-                st.info("ℹ️ 暂无可用玩家，请先在上下文中添加玩家信息")
+        # 原子动作界面内容（军令功能已移至tab4）
+        st.info("⚔️ 军令操作功能已移至【军令操作】标签页")
         
-        # 个性化军令预览功能
-        st.subheader("⚔️ 个性化军令预览")
-        
-        # 检查是否有批量生成的军令结果
-        if st.session_state.batch_generated_orders:
-            st.markdown("### 📋 批量生成的军令预览")
-            
-            # 创建选择框让用户选择要查看的玩家军令
-            player_options = []
-            for order in st.session_state.batch_generated_orders:
-                player_name = order.get("player_name", "未知玩家")
-                player_id = order.get("player_id", "unknown")
-                player_options.append(f"{player_name} ({player_id})")
-            
-            if player_options:
-                selected_player_display = st.selectbox(
-                    "选择要查看军令的玩家：",
-                    options=player_options,
-                    key="selected_player_for_preview"
-                )
-                
-                # 找到对应的军令
-                selected_index = player_options.index(selected_player_display)
-                selected_order = st.session_state.batch_generated_orders[selected_index]
-                
-                # 显示军令内容
-                st.markdown("### 📜 军令内容")
-                military_order_content = selected_order.get("military_order", "军令内容未找到")
-                st.markdown(f"```\n{military_order_content}\n```")
-                
-                # 显示队伍分析
-                if selected_order.get("team_analysis"):
-                    st.markdown("### 📊 队伍分析")
-                    for team in selected_order["team_analysis"]:
-                        st.write(f"• **队伍{team.get('team_number', 'N/A')}**: {team.get('level', 'N/A')}级, 体力{team.get('stamina', 'N/A')}%, 能力: {team.get('capability', 'N/A')}")
-                        st.write(f"  任务安排: {team.get('assignment', 'N/A')}")
-                
-                # 清除批量结果按钮（清理进度状态）
-                if st.button("🗑️ 清除批量结果", key="clear_batch_results"):
-                    st.session_state.batch_generated_orders = None
-                    st.session_state.batch_generation_in_progress = False
-                    st.session_state.batch_generation_total = 0
-                    st.session_state.batch_generation_processed = 0
-                    st.session_state.batch_generation_error = None
-                    st.rerun()
-        
-        # 检查是否有单个玩家生成的军令结果
-        elif st.session_state.single_generated_order:
-            st.markdown("### 👤 单个玩家军令预览")
-            
-            order = st.session_state.single_generated_order
-            player_name = order.get("player_name", "未知玩家")
-            player_id = order.get("player_id", "unknown")
-            
-            st.markdown(f"**玩家**: {player_name} ({player_id})")
-            
-            # 显示军令内容
-            st.markdown("### 📜 军令内容")
-            military_order_content = order.get("military_order", "军令内容未找到")
-            st.markdown(f"```\n{military_order_content}\n```")
-            
-            # 清除单个结果按钮
-            if st.button("🗑️ 清除单个军令", key="clear_single_result"):
-                st.session_state.single_generated_order = None
-                st.rerun()
-        
-        else:
-            st.info("💡 暂无生成的军令，请先生成批量军令或单个玩家军令。")
-        
-        # 单个玩家军令生成预览
-        with st.expander("单个玩家军令生成", expanded=False):
-            if st.button("🎯 生成当前玩家军令预览", key="generate_single_military_order_preview"):
-                if player_state_manager:
-                    from game_monitoring.tools.military_order_tool import generate_personalized_military_order
-                    
-                    # 获取玩家状态
-                    player_state = player_state_manager.get_player_state(st.session_state.current_player_id)
-                    
-                    # 生成军令
-                    military_order = generate_personalized_military_order(
-                        player_id=st.session_state.current_player_id,
-                        player_name=player_state.player_name or "勇士",
-                        team_stamina=player_state.team_stamina or 50,
-                        backpack_items=player_state.backpack_items or [],
-                        team_levels=player_state.team_levels or {},
-                        skill_levels=player_state.skill_levels or {},
-                        reserve_troops=player_state.reserve_troops or 0
-                    )
-                    
-                    # 存储单个玩家军令到session_state
-                    st.session_state.single_generated_order = {
-                        "player_id": st.session_state.current_player_id,
-                        "player_name": player_state.player_name or "勇士",
-                        "military_order": military_order,
-                        "timestamp": datetime.now()
-                    }
-                    # 清除批量军令结果（优先显示单个结果）
-                    st.session_state.batch_generated_orders = None
-                    
-                    st.success(f"✅ 已生成玩家 {player_state.player_name or '勇士'} 的个性化军令！军令预览将自动显示在下方")
-                    add_agent_log(f"🎯 已生成玩家 {st.session_state.current_player_id} 的个性化军令预览")
-                    # 触发页面刷新以显示预览
-                    st.rerun()
-                else:
-                    st.error("玩家状态管理器未初始化")
-        
-        # 发送军令功能 - 单独的部分
-        st.subheader("📤 发送军令")
-        with st.expander("发送军令给玩家", expanded=False):
-            st.markdown("### 选择发送方式")
-            
-            # 如果有批量生成的军令，提供批量发送选项
-            if st.session_state.batch_generated_orders:
-                st.markdown("#### 📋 批量发送军令")
-                if st.button("📤 发送所有批量生成的军令", key="send_batch_military_orders"):
-                    from game_monitoring.tools.military_order_tool import send_military_order
-                    
-                    success_count = 0
-                    total_count = len(st.session_state.batch_generated_orders)
-                    
-                    for order in st.session_state.batch_generated_orders:
-                        player_id = order.get("player_id", "unknown")
-                        player_name = order.get("player_name", "未知玩家")
-                        military_order = order.get("military_order", "")
-                        
-                        if military_order:
-                            try:
-                                result_string = send_military_order(player_id, military_order)
-                                result_dict = json.loads(result_string)
-                                
-                                if result_dict.get("status") == "success":
-                                    success_count += 1
-                                    add_agent_log(f"✔️ 成功发送军令给 {player_name}")
-                                else:
-                                    add_agent_log(f"❌ 发送军令给 {player_name} 失败: {result_dict.get('message', '未知错误')}")
-                            except Exception as e:
-                                add_agent_log(f"❌ 发送军令给 {player_name} 异常: {str(e)}")
-                    
-                    if success_count == total_count:
-                        st.success(f"✅ 成功发送所有 {total_count} 份军令！")
-                    elif success_count > 0:
-                        st.warning(f"⚠️ 成功发送 {success_count}/{total_count} 份军令")
-                    else:
-                        st.error(f"❌ 所有军令发送失败")
-                
-                st.markdown("---")
-            
-            # 单个玩家发送军令
-            st.markdown("#### 👤 单个玩家发送军令")
-            if st.button("📤 发送当前玩家军令", key="send_single_military_order"):
-                if player_state_manager:
-                    from game_monitoring.tools.military_order_tool import generate_personalized_military_order, send_military_order
-                    
-                    # 获取玩家状态
-                    player_state = player_state_manager.get_player_state(st.session_state.current_player_id)
-                    
-                    # 生成军令
-                    military_order = generate_personalized_military_order(
-                        player_id=st.session_state.current_player_id,
-                        player_name=player_state.player_name or "勇士",
-                        team_stamina=player_state.team_stamina or 50,
-                        backpack_items=player_state.backpack_items or [],
-                        team_levels=player_state.team_levels or {},
-                        skill_levels=player_state.skill_levels or {},
-                        reserve_troops=player_state.reserve_troops or 0
-                    )
-                    
-                    # 发送军令
-                    result_string = send_military_order(st.session_state.current_player_id, military_order)
-
-                    try:
-                        # 将 JSON 字符串解析成 Python 字典
-                        result_dict = json.loads(result_string)
-                        
-                        # 检查 'status' 键的值是否为 'success'
-                        if result_dict.get("status") == "success":
-                            # 成功的逻辑
-                            success_message = result_dict.get("message", "军令发送成功！")
-                            add_agent_log(f"✔️ {success_message}")
-                            st.success(success_message)
-                        else:
-                            # 失败的逻辑
-                            error_message = result_dict.get("message", "军令发送失败。")
-                            add_agent_log(f"❌ {error_message}")
-                            st.error(error_message)
-
-                    except json.JSONDecodeError:
-                        # 如果返回的不是一个合法的 JSON 字符串，也作为失败处理
-                        error_message = f"军令发送失败：无法解析返回结果 - {result_string}"
-                        add_agent_log(f"❌ {error_message}")
-                        st.error(error_message)
-                else:
-                    st.error("玩家状态管理器未初始化")
+        # 这里可以添加其他原子动作功能
         
         action_definitions = st.session_state.action_definitions
         
@@ -1100,6 +1132,8 @@ def main():
             "dismantle_equipment": "分解装备",
             "unlock_achievement": "解锁成就",
             "unlock_map": "解锁地图",
+            "stamina_exhausted": "体力耗尽",
+            "attempt_enter_dungeon_no_stamina": "无体力进副本",
             # 社交动作
             "join_family": "加入家族",
             "leave_family": "离开家族",
@@ -1158,6 +1192,108 @@ def main():
                                 use_container_width=True
                             ):
                                 run_async(process_atomic_action(st.session_state.current_player_id, action_name))
+                                
+                                # 体力相关动作的特殊处理
+                                if action_name in ['stamina_exhausted', 'attempt_enter_dungeon_no_stamina']:
+                                    # 初始化体力计数器
+                                    if 'stamina_exhaustion_count' not in st.session_state:
+                                        st.session_state.stamina_exhaustion_count = 0
+                                    
+                                    st.session_state.stamina_exhaustion_count += 1
+                                    add_stamina_guide_log(f"执行动作: {chinese_name}")
+                                    
+                                    # 检查是否触发体力耗尽规则
+                                    rule_engine = st.session_state.rule_engine
+                                    if rule_engine:
+                                        recent_actions = st.session_state.action_sequence[-10:] if st.session_state.action_sequence else []
+                                        action_names = [action['action'] for action in recent_actions]
+                                        
+                                        # 统计最近动作中体力相关动作的次数
+                                        stamina_count = sum(1 for a in action_names if a in ['stamina_exhausted', 'attempt_enter_dungeon_no_stamina'])
+                                        
+                                        if stamina_count >= 3:
+                                            add_stamina_guide_log("🚨 检测到体力耗尽模式，触发引导Agent")
+                                            
+                                            # 定义异步处理函数
+                                            async def process_stamina_guide():
+                                                
+                                                    # 创建Agent实例
+                                                    from game_monitoring.agents.stamina_guide_agent import create_stamina_guide_agent
+                                                    
+                                                    stamina_agent = create_stamina_guide_agent()
+                                                    # add_stamina_guide_log("✅ Agent创建成功")
+                                                    
+                                                    # 构建引导请求消息
+                                                    # guide_message = f"玩家{st.session_state.current_player_id}体力耗尽次数达到阈值"
+                                                    guide_message = "玩家孤独的凤凰战士体力耗尽次数达到阈值"
+                                                    add_stamina_guide_log(f"📤 发送引导消息: {guide_message}")
+                                                    
+                                                    # 使用run_stream方法进行流式处理
+                                                    response_stream = stamina_agent.run_stream(task=guide_message)
+                                                    # add_stamina_guide_log("✅ 开始处理流式响应...")
+                                                    
+                                                    # 收集所有流式响应
+                                                    final_response = None
+                                                    response_count = 0
+                                                    
+                                                    async for response in response_stream:
+                                                        response_count += 1
+                                                        # add_stamina_guide_log(f"📥 收到响应 #{response_count}")
+                                                        
+                                                        if hasattr(response, 'messages') and response.messages:
+                                                            # 获取最后一条消息作为最终响应
+                                                            final_response = response.messages[-1]
+                                                        elif hasattr(response, 'chat_message'):
+                                                            # 直接获取chat_message
+                                                            final_response = response.chat_message
+                                                    
+                                                    # 处理最终响应并构建结果
+                                                    if final_response and hasattr(final_response, 'content'):
+                                                        response_text = final_response.content
+                                                        add_stamina_guide_log(f"💡 引导内容: {response_text}")
+                                                        
+                                                        guidance_result = {
+                                                            "player_id": st.session_state.current_player_id,
+                                                            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                                            "trigger_reason": f"体力耗尽次数达到{stamina_count}次",
+                                                            "guidance_content": response_text,
+                                                            "status": "success"
+                                                        }
+                                                        st.session_state.stamina_guidance_results.append(guidance_result)
+                                                        add_stamina_guide_log("✅ 引导完成，结果已保存")
+                                                        
+                                                    else:
+                                                        add_stamina_guide_log(f"❌ 响应格式不正确: {type(final_response)}")
+                                                        guidance_result = {
+                                                            "player_id": st.session_state.current_player_id,
+                                                            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                                            "trigger_reason": f"体力耗尽次数达到{stamina_count}次",
+                                                            "guidance_content": "引导失败: 响应格式错误",
+                                                            "status": "error"
+                                                        }
+                                                        st.session_state.stamina_guidance_results.append(guidance_result)
+                                            
+                                            # 在后台线程中执行异步函数，避免阻塞UI
+                                            import asyncio as _asyncio
+                                            def _run_stamina_guide_bg():
+                                                try:
+                                                    loop = _asyncio.new_event_loop()
+                                                    _asyncio.set_event_loop(loop)
+                                                    loop.run_until_complete(process_stamina_guide())
+                                                finally:
+                                                    try:
+                                                        loop.close()
+                                                    except Exception:
+                                                        pass
+                                            t = Thread(target=_run_stamina_guide_bg, name="stamina_guide_thread", daemon=True)
+                                            try:
+                                                if add_script_run_ctx is not None:
+                                                    add_script_run_ctx(t)
+                                            except Exception:
+                                                pass
+                                            t.start()
+                                            
+                                
                                 st.rerun()
         
         # 核心游戏动作 - 显示所有动作
