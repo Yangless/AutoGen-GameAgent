@@ -12,6 +12,36 @@
 
 ## 🏗️ 系统架构
 
+## 架构改进（v2.0）
+
+### Orchestrator-Worker 架构
+
+系统已新增面向高吞吐与可控输出的 Orchestrator-Worker 架构：
+
+- `OrchestratorAgent`：接收玩家事件、生成任务、汇总多个 Worker 结果
+- `EmotionWorker`：分析情绪并选择安抚策略
+- `ChurnWorker`：评估流失风险并生成挽回方案
+- `BehaviorWorker`：识别异常行为并给出管控措施
+- `OutputValidator`：执行 JSON 提取、Pydantic 校验和自我修正重试
+- `MemoryService`：提供短期窗口记忆和长期摘要压缩能力
+
+### 核心特性
+
+- 并行处理：面向三类 Worker 的任务拆分与结果合并
+- 输出可控：Pydantic 校验加自我修正重试机制
+- 状态隔离：基于 `session_id` 的事件和记忆隔离
+- 记忆优化：短期窗口加长期摘要，降低上下文消耗
+
+### 性能指标
+
+| 指标 | 目标 | 当前验证 |
+|------|------|----------|
+| 处理能力 | ≥3000条/日 | 已添加验证测试 |
+| 输出错误率 | ≤11% | 已添加验证测试 |
+| Token消耗降低 | ≥55% | 已添加验证测试 |
+
+部署说明见 [docs/deployment/orchestrator-worker-deployment.md](docs/deployment/orchestrator-worker-deployment.md)。
+
 ### 核心组件
 
 1. **玩家行为模拟器** (`PlayerBehaviorSimulator`)

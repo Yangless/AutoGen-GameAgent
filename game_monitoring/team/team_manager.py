@@ -1,48 +1,57 @@
-from pkgutil import extend_path
-from autogen_agentchat.teams import MagenticOneGroupChat
-from autogen_agentchat.ui import Console
-from config import doubao_client
-from ..agents.analysis_agents import (
-    create_emotion_recognition_agent,
-    create_churn_risk_agent,
-    create_bot_detection_agent,
-    create_behavioral_analyst_agent
-)
-from ..agents.intervention_agents import (
-    create_engagement_agent,
-    create_guidance_agent
-)
-from ..agents.military_order_agent import (
-    create_military_order_agent
-)
+from __future__ import annotations
+
+import uuid
+from typing import Any
+
+from autogen_core import AgentId
+
+from ..domain.messages import PlayerEvent
 from ..monitoring.behavior_monitor import BehaviorMonitor
-from typing import List
-import mlflow
 
+_LEGACY_TEAM_IMPORT_ERROR: ModuleNotFoundError | None = None
 
+try:
+    from autogen_agentchat.teams import MagenticOneGroupChat
+    from autogen_agentchat.ui import Console
+    from config import doubao_client
+    from ..agents.analysis_agents import (
+        create_behavioral_analyst_agent,
+        create_bot_detection_agent,
+        create_churn_risk_agent,
+        create_emotion_recognition_agent,
+    )
+    from ..agents.intervention_agents import (
+        create_engagement_agent,
+        create_guidance_agent,
+    )
+    from ..agents.military_order_agent import create_military_order_agent
+except ModuleNotFoundError as exc:
+    _LEGACY_TEAM_IMPORT_ERROR = exc
+    MagenticOneGroupChat = None
+    Console = None
+    doubao_client = None
 
 
 class GameMonitoringTeam:
-    """游戏监控多智能体团队管理器"""
-    
+    """游戏监控多智能体团队管理器。"""
+
     def __init__(self, model_client=None, player_id="default_player"):
+        if _LEGACY_TEAM_IMPORT_ERROR is not None:
+            raise ModuleNotFoundError(
+                "GameMonitoringTeam requires autogen_agentchat and legacy team dependencies."
+            ) from _LEGACY_TEAM_IMPORT_ERROR
+
         self.model_client = model_client or doubao_client
         self.player_id = player_id
-        
-        # 创建所有Agent，传递 player_id
+
         self.emotion_agent = create_emotion_recognition_agent(player_id)
         self.churn_agent = create_churn_risk_agent(player_id)
         self.bot_agent = create_bot_detection_agent(player_id)
         self.behavioral_analyst_agent = create_behavioral_analyst_agent(player_id)
-        
-        # 这些 Agent 不需要依赖
         self.engagement_agent = create_engagement_agent()
         self.guidance_agent = create_guidance_agent()
-        
-        # 创建军令Agent
         self.military_order_agent = create_military_order_agent()
-        
-        # 创建团队
+
         self.analysis_team = MagenticOneGroupChat(
             [
                 self.emotion_agent,
@@ -53,14 +62,17 @@ class GameMonitoringTeam:
                 self.guidance_agent,
                 self.military_order_agent,
             ],
-            model_client=self.model_client
+            model_client=self.model_client,
         )
-    # @mlflow.trace(name="[Main-Agent] Analysis Orchestrator", span_type="ORCHESTRATOR")
-    async def trigger_analysis_and_intervention(self, player_id: str, monitor: BehaviorMonitor):
-        """触发对指定玩家的分析和干预"""
-        # print(f"\n🤖 启动多智能体团队，为玩家 {player_id} 进行分析和干预...")
+
+    async def trigger_analysis_and_intervention(
+        self, player_id: str, monitor: BehaviorMonitor
+    ):
+        """触发对指定玩家的分析和干预。"""
         behaviors = monitor.get_player_history(player_id)
-        behavior_summary = "\n".join([f"- {b.timestamp.strftime('%H:%M:%S')}: {b.action}" for b in behaviors[-5:]])
+        behavior_summary = "\n".join(
+            [f"- {b.timestamp.strftime('%H:%M:%S')}: {b.action}" for b in behaviors[-5:]]
+        )
 
         task = f"""
         **紧急警报：玩家 {player_id} 行为异常，启动多智能体协作流程。**
@@ -73,16 +85,15 @@ class GameMonitoringTeam:
         **你的角色与任务:**
         你现在是这个多智能体团队的 **首席调度官 (Chief Orchestrator)**。你的职责是高效地协调团队中的各位专家Agent，对玩家进行全面的分析，并根据分析结果执行最恰当的干预措施。输出为中文。
         """
-        # 使用 Console UI 以流式方式运行团队，实时查看过程
-        print("\n" + "="*25 + " 团队实时动态 " + "="*23)
-        
+
+        print("\n" + "=" * 25 + " 团队实时动态 " + "=" * 23)
         await Console(self.analysis_team.run_stream(task=task))
-        print("="*62 + "\n")
-    
+        print("=" * 62 + "\n")
+
     async def generate_batch_military_orders(self, commander_order: str = None):
-        """使用军令Agent批量生成多玩家个性化军令"""
-        print(f"\n🎯 启动军令Agent，批量生成个性化军令...")
-        
+        """使用军令Agent批量生成多玩家个性化军令。"""
+        print("\n🎯 启动军令Agent，批量生成个性化军令...")
+
         task = f"""
         **军令生成任务：批量为多个玩家生成个性化军令**
 
@@ -97,7 +108,51 @@ class GameMonitoringTeam:
 
         请立即开始执行批量军令生成任务。
         """
-        
-        print("\n" + "="*25 + " 军令生成动态 " + "="*23)
+
+        print("\n" + "=" * 25 + " 军令生成动态 " + "=" * 23)
         await Console(self.military_order_agent.run_stream(task=task))
-        print("="*62 + "\n")
+        print("=" * 62 + "\n")
+
+
+class GameMonitoringTeamV2:
+    """新版团队管理器，使用 Orchestrator-Worker 架构。"""
+
+    def __init__(self, model_client: Any, runtime: Any):
+        self.model_client = model_client
+        self.runtime = runtime
+        self.orchestrator_id = AgentId("orchestrator", "default")
+
+    async def trigger_analysis_and_intervention(
+        self, player_id: str, monitor: Any
+    ) -> Any:
+        """构造 PlayerEvent 并发送到 Orchestrator。"""
+        event = PlayerEvent(
+            player_id=player_id,
+            triggered_scenarios=self._get_triggered_scenarios(monitor, player_id),
+            behavior_history=self._get_behavior_history(monitor, player_id),
+            session_id=self._generate_session_id(player_id),
+        )
+
+        return await self.runtime.send_message(event, self.orchestrator_id)
+
+    def _generate_session_id(self, player_id: str) -> str:
+        """生成 session ID。"""
+        return f"{player_id}-{uuid.uuid4().hex[:8]}"
+
+    @staticmethod
+    def _get_triggered_scenarios(monitor: Any, player_id: str) -> list[dict[str, Any]]:
+        if hasattr(monitor, "get_triggered_scenarios"):
+            return monitor.get_triggered_scenarios()
+        if hasattr(monitor, "get_recent_actions_for_analysis"):
+            return monitor.get_recent_actions_for_analysis(player_id)
+        return []
+
+    @staticmethod
+    def _get_behavior_history(monitor: Any, player_id: str) -> list[Any]:
+        if hasattr(monitor, "get_behavior_history"):
+            return monitor.get_behavior_history(player_id)
+        if hasattr(monitor, "get_player_action_sequence"):
+            return monitor.get_player_action_sequence(player_id)
+        if hasattr(monitor, "get_player_history"):
+            return monitor.get_player_history(player_id)
+        return []
