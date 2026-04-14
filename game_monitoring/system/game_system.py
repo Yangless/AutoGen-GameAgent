@@ -1,49 +1,30 @@
 import asyncio
 import random
 import time
-from datetime import datetime
-
-from autogen_core import SingleThreadedAgentRuntime
 
 try:
     from config import custom_model_client
 except ModuleNotFoundError:
     custom_model_client = None
 
+from ..core.bootstrap import bootstrap_application
+from ..core.context import GameContext
 from ..simulator import PlayerBehaviorSimulator
-from ..monitoring import BehaviorMonitor
-from ..monitoring.player_state import PlayerStateManager
-from ..team import GameMonitoringTeam, GameMonitoringTeamV2
+from ..team import GameMonitoringTeamV2
 from ..ui import GameMonitoringConsole
 from .action_sequence_manager import ActionSequenceManager
 
 class GamePlayerMonitoringSystem:
     """游戏玩家监控系统主协调器"""
     
-    def __init__(self, model_client=None, use_v2_runtime: bool = True):
+    def __init__(self, model_client=None):
         self.model_client = model_client or custom_model_client
-        self.use_v2_runtime = use_v2_runtime
         self.simulator = PlayerBehaviorSimulator()
-        # 创建监控器实例
-        self.monitor = BehaviorMonitor(threshold=3)
-        # 创建玩家状态管理器实例
-        self.player_state_manager = PlayerStateManager()
-        
-        # 初始化全局上下文
-        from ..context import initialize_context
-        initialize_context(self.monitor, self.player_state_manager)
-        
-        if self.use_v2_runtime:
-            self.team = GameMonitoringTeamV2(
-                model_client=self.model_client,
-                runtime=SingleThreadedAgentRuntime(),
-            )
-        else:
-            # 创建多智能体团队，使用默认 player_id
-            self.team = GameMonitoringTeam(
-                model_client=self.model_client,
-                player_id="player_1"  # 默认玩家ID，可以根据需要动态创建
-            )
+        self.container = bootstrap_application(custom_model_client=self.model_client)
+        self.context = self.container.resolve(GameContext)
+        self.monitor = self.context.monitor
+        self.player_state_manager = self.context.player_state_manager
+        self.team = self.container.resolve(GameMonitoringTeamV2)
         
         # 创建UI控制台
         self.ui = GameMonitoringConsole()
@@ -86,6 +67,8 @@ class GamePlayerMonitoringSystem:
                 # 将生成的行为数据保存到monitor中
                 if self.monitor.add_behavior(behavior):
                     await self.trigger_analysis_and_intervention(player_id)
+                    if hasattr(self.monitor, "reset_negative_count"):
+                        self.monitor.reset_negative_count(player_id)
                     # 计数器重置现在在streamlit_dashboard.py中处理
                     self.ui.print_reset_count(player_id)
                 
@@ -109,6 +92,8 @@ class GamePlayerMonitoringSystem:
                     # 将行为数据保存到monitor中
                     if self.monitor.add_behavior(behavior):
                         await self.trigger_analysis_and_intervention(player_id)
+                        if hasattr(self.monitor, "reset_negative_count"):
+                            self.monitor.reset_negative_count(player_id)
                         # 计数器重置现在在streamlit_dashboard.py中处理
                         self.ui.print_reset_count(player_id)
                     

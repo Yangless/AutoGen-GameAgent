@@ -71,4 +71,4 @@ uv run python -m pytest tests -v
 
 - `MemoryService` 当前支持注入式 client 和延迟 Redis 连接，便于本地测试与生产部署共存。
 - `GameMonitoringTeamV2` 使用 `AgentId("orchestrator", "default")` 作为新版入口。
-- `GamePlayerMonitoringSystem` 默认使用 v2 runtime；如需保留旧链路，可显式传入 `use_v2_runtime=False`。
+- `GamePlayerMonitoringSystem` 和 Streamlit Dashboard 都固定走 v2 runtime，不再提供 legacy runtime 切换开关。

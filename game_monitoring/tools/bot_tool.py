@@ -4,12 +4,16 @@ from datetime import datetime
 
 def detect_bot_with_deps(player_id: str) -> str:
     """检测玩家机器人行为（带依赖版本）"""
-    from ..context import get_global_monitor, get_global_player_state_manager, is_context_initialized
+    from .runtime_access import (
+        get_monitor,
+        get_player_state_manager,
+        is_context_initialized,
+    )
     
     print(f"🤖 正在检测玩家 {player_id} 的机器人行为...")
     
-    monitor = get_global_monitor()
-    player_state_manager = get_global_player_state_manager()
+    monitor = get_monitor()
+    player_state_manager = get_player_state_manager()
     
     if not is_context_initialized():
         print("⚠️ 全局上下文未初始化，使用模拟数据")

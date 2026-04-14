@@ -16,7 +16,7 @@ def generate_batch_military_orders(commander_order: str = None) -> str:
     Returns:
         批量生成结果的JSON字符串
     """
-    from ..context import get_players_info, get_commander_order
+    from .runtime_access import get_players_info, get_commander_order
     
     # 获取指挥官总军令
     if commander_order is None:
@@ -186,7 +186,7 @@ def generate_military_order_with_llm(
     Returns:
         生成的军令内容JSON字符串
     """
-    from ..context import get_commander_order
+    from .runtime_access import get_commander_order
     
     # 获取指挥官总军令
     if commander_order is None:

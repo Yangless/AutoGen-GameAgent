@@ -9,17 +9,11 @@ Agent服务
 
 from __future__ import annotations
 
-import asyncio
-import threading
-from typing import Optional, Callable, List, TYPE_CHECKING
+from typing import Optional, Callable, List, Protocol, Any
 from dataclasses import dataclass, field
 from datetime import datetime
 
 from ...core.context import GameContext
-
-if TYPE_CHECKING:
-    from ...team.team_manager import GameMonitoringTeam
-
 
 @dataclass
 class InterventionResult:
@@ -27,8 +21,16 @@ class InterventionResult:
     player_id: str
     success: bool
     message: str
+    payload: Any = None
     logs: List[str] = field(default_factory=list)
     timestamp: datetime = field(default_factory=datetime.now)
+
+
+class MonitoringTeam(Protocol):
+    async def trigger_analysis_and_intervention(
+        self, player_id: str, monitor: Any
+    ) -> Any:
+        ...
 
 
 class AgentService:
@@ -41,7 +43,7 @@ class AgentService:
     def __init__(
         self,
         game_context: GameContext,
-        team_factory: Callable[[], GameMonitoringTeam] = None,
+        team_factory: Optional[Callable[[], MonitoringTeam]] = None,
     ):
         self._context = game_context
         self._team_factory = team_factory
@@ -76,7 +78,7 @@ class AgentService:
                 )
 
             # 直接调用（简化版本）
-            await team.trigger_analysis_and_intervention(
+            payload = await team.trigger_analysis_and_intervention(
                 player_id,
                 self._context.monitor
             )
@@ -84,7 +86,8 @@ class AgentService:
             return InterventionResult(
                 player_id=player_id,
                 success=True,
-                message="干预已触发"
+                message="干预已触发",
+                payload=payload,
             )
 
         except Exception as e:
@@ -105,10 +108,30 @@ class AgentService:
 
 
 # 便捷工厂函数
-def create_team_factory(container) -> Callable[[], GameMonitoringTeam]:
+def create_team_factory(container) -> Callable[[], Optional[MonitoringTeam]]:
     """创建Team工厂"""
+    from ...team.team_manager import GameMonitoringTeamV2
+
+    def try_resolve(interface):
+        try:
+            return container.resolve(interface)
+        except Exception:
+            return None
+
     def factory():
-        # 这里可以从容器解析team配置
-        # 暂时返回None，需要实际配置
+        resolved_factory = try_resolve("team_factory")
+        if callable(resolved_factory) and not hasattr(
+            resolved_factory, "trigger_analysis_and_intervention"
+        ):
+            return resolved_factory()
+        if resolved_factory is not None:
+            return resolved_factory
+
+        for interface in (GameMonitoringTeamV2, "team"):
+            resolved = try_resolve(interface)
+            if resolved is not None:
+                return resolved
+
         return None
+
     return factory

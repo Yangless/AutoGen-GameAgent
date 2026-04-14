@@ -5,12 +5,15 @@
 """
 
 import asyncio
-from typing import List, Dict, Any, Optional
-from datetime import datetime
+from typing import List, Dict, Any, Protocol
 
 from ..monitoring.behavior_monitor import BehaviorMonitor
-from ..team.team_manager import GameMonitoringTeam
 from ..ui.interactive_ui import InteractiveActionUI
+
+
+class MonitoringTeam(Protocol):
+    async def trigger_analysis_and_intervention(self, player_id: str, monitor: Any):
+        ...
 
 
 class ActionSequenceManager:
@@ -23,7 +26,7 @@ class ActionSequenceManager:
     3. 如果触发高层级场景，启动相应的智能体团队
     """
     
-    def __init__(self, monitor: BehaviorMonitor, team: GameMonitoringTeam):
+    def __init__(self, monitor: BehaviorMonitor, team: MonitoringTeam):
         self.monitor = monitor
         self.team = team
         self.ui = InteractiveActionUI()
@@ -72,7 +75,7 @@ class ActionSequenceManager:
                 elif choice == '6':
                     await self._analyze_and_trigger_agents()
                 elif choice == '7':
-                    self.ui.clear_sequence()
+                    self._clear_current_sequence()
                 elif choice == '8':
                     await self._simulate_preset_scenario()
                 else:
@@ -174,7 +177,7 @@ class ActionSequenceManager:
             return
             
         # 重新分析整个序列
-        triggered_scenarios = self.monitor._analyze_action_sequence(self.current_player_id)
+        triggered_scenarios = self.monitor.analyze_current_sequence(self.current_player_id)
         
         if triggered_scenarios:
             print(f"\n🚨 序列分析结果: 检测到 {len(triggered_scenarios)} 个场景")
@@ -184,6 +187,11 @@ class ActionSequenceManager:
             await self._trigger_agent_analysis(triggered_scenarios)
         else:
             print("✅ 当前序列未触发任何特定场景")
+
+    def _clear_current_sequence(self):
+        """同步清空 UI 和监控器中的当前序列。"""
+        self.ui.clear_sequence()
+        self.monitor.clear_player_sequence(self.current_player_id)
             
     async def _trigger_agent_analysis(self, scenarios: List[Dict[str, str]]):
         """触发智能体团队分析"""
@@ -260,7 +268,7 @@ class ActionSequenceManager:
             await asyncio.sleep(0.5)  # 模拟时间间隔
             
         # 触发分析
-        final_scenarios = self.monitor._analyze_action_sequence(self.current_player_id)
+        final_scenarios = self.monitor.analyze_current_sequence(self.current_player_id)
         if final_scenarios:
             await self._trigger_agent_analysis(final_scenarios)
             
@@ -285,7 +293,7 @@ class ActionSequenceManager:
             print(f"   添加动作: {action} {params}")
             await asyncio.sleep(0.5)
             
-        final_scenarios = self.monitor._analyze_action_sequence(self.current_player_id)
+        final_scenarios = self.monitor.analyze_current_sequence(self.current_player_id)
         if final_scenarios:
             await self._trigger_agent_analysis(final_scenarios)
             
@@ -313,7 +321,7 @@ class ActionSequenceManager:
             print(f"   添加动作: {action} {params}")
             await asyncio.sleep(0.5)
             
-        final_scenarios = self.monitor._analyze_action_sequence(self.current_player_id)
+        final_scenarios = self.monitor.analyze_current_sequence(self.current_player_id)
         if final_scenarios:
             await self._trigger_agent_analysis(final_scenarios)
             
@@ -330,20 +338,25 @@ class ActionSequenceManager:
             print(f"   添加动作: {action}")
             await asyncio.sleep(0.1)  # 极短间隔模拟机器人
             
-        final_scenarios = self.monitor._analyze_action_sequence(self.current_player_id)
+        final_scenarios = self.monitor.analyze_current_sequence(self.current_player_id)
         if final_scenarios:
             await self._trigger_agent_analysis(final_scenarios)
 
 
 if __name__ == "__main__":
     # 测试动作序列管理器
+    from autogen_core import SingleThreadedAgentRuntime
+
     from ..monitoring.behavior_monitor import BehaviorMonitor
-    from ..team.team_manager import GameMonitoringTeam
+    from ..team.team_manager import GameMonitoringTeamV2
     from config import custom_model_client
     
     async def test_manager():
         monitor = BehaviorMonitor()
-        team = GameMonitoringTeam(model_client=custom_model_client)
+        team = GameMonitoringTeamV2(
+            model_client=custom_model_client,
+            runtime=SingleThreadedAgentRuntime(),
+        )
         manager = ActionSequenceManager(monitor, team)
         
         await manager.start_interactive_session()

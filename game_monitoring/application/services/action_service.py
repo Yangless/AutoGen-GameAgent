@@ -64,7 +64,6 @@ class ActionProcessingService:
     def __init__(self, game_context: GameContext):
         self._context = game_context
         self._monitor = game_context.monitor
-        self._negative_counts: Dict[str, int] = {}
 
     async def process_action(
         self,
@@ -142,16 +141,20 @@ class ActionProcessingService:
 
     def _increment_negative_count(self, player_id: str) -> int:
         """增加负面计数"""
-        self._negative_counts[player_id] = self._negative_counts.get(player_id, 0) + 1
-        return self._negative_counts[player_id]
+        if hasattr(self._monitor, "increment_negative_count"):
+            return self._monitor.increment_negative_count(player_id)
+        return 0
 
     def _get_negative_count(self, player_id: str) -> int:
         """获取当前负面计数"""
-        return self._negative_counts.get(player_id, 0)
+        if hasattr(self._monitor, "get_negative_count"):
+            return self._monitor.get_negative_count(player_id)
+        return 0
 
     def reset_negative_count(self, player_id: str) -> None:
         """重置负面计数"""
-        self._negative_counts[player_id] = 0
+        if hasattr(self._monitor, "reset_negative_count"):
+            self._monitor.reset_negative_count(player_id)
 
     def get_info(self, player_id: str) -> Dict[str, Any]:
         """获取玩家处理信息"""

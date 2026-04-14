@@ -5,13 +5,17 @@ from datetime import datetime
 
 def analyze_emotion_with_deps(player_id: str) -> str:
     """分析玩家情绪状态（带依赖版本）"""
-    from ..context import get_global_monitor, get_global_player_state_manager, is_context_initialized
+    from .runtime_access import (
+        get_monitor,
+        get_player_state_manager,
+        is_context_initialized,
+    )
     
     print(f"🔍 正在分析玩家 {player_id} 的情绪状态...")
     
     # 获取全局实例
-    monitor = get_global_monitor()
-    player_state_manager = get_global_player_state_manager()
+    monitor = get_monitor()
+    player_state_manager = get_player_state_manager()
     
     if not is_context_initialized():
         print("⚠️ 全局上下文未初始化，使用模拟数据")

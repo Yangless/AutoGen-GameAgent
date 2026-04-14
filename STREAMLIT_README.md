@@ -111,18 +111,17 @@ http://localhost:8501
 
 ### 核心组件
 
-- **GamePlayerMonitoringSystem**: 主系统协调器
+- **Dashboard Runtime Bundle**: 由 `build_runtime_bundle()` 暴露容器、上下文、服务和仓储
 - **BehaviorMonitor**: 行为监控器，管理阈值触发
 - **PlayerStateManager**: 玩家状态管理器
 - **PlayerBehaviorSimulator**: 行为模拟器
 - **GameMonitoringTeamV2**: 默认多智能体运行入口
-- **GameMonitoringTeam**: legacy 兼容链路，可选回退
 
 ### 工作流程
 
-1. **行为生成**: 用户点击按钮 → 生成 PlayerBehavior 对象
-2. **阈值检测**: BehaviorMonitor 检查是否达到分析阈值
-3. **智能体分析**: 通过 `GameMonitoringTeamV2` 将 `PlayerEvent` 发送到 orchestrator runtime
+1. **行为生成**: 用户点击按钮 → 调用 `ActionProcessingService`
+2. **阈值检测**: `BehaviorMonitor` 记录动作、分析规则并维护负面计数
+3. **智能体分析**: `AgentService` 通过 `GameMonitoringTeamV2` 将 `PlayerEvent` 发送到 orchestrator runtime
 4. **结果聚合**: orchestrator 汇总 3 个 workers 的响应并返回最终决策
 5. **界面刷新**: Streamlit 自动更新显示最新状态
 

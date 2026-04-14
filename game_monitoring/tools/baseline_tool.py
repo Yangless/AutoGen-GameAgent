@@ -11,7 +11,11 @@ def get_historical_baseline_with_deps(player_id: str) -> Dict[str, Any]:
     Returns:
         包含玩家综合状态信息的字典，便于LLM总结
     """
-    from ..context import get_global_monitor, get_global_player_state_manager, is_context_initialized
+    from .runtime_access import (
+        get_monitor,
+        get_player_state_manager,
+        is_context_initialized,
+    )
 
     # 使用卫语句模式，在函数入口处检查依赖，确保代码健壮性
     if not is_context_initialized():
@@ -19,8 +23,8 @@ def get_historical_baseline_with_deps(player_id: str) -> Dict[str, Any]:
         return {"error": "Context not initialized", "player_id": player_id}
 
     # 从context获取真实实例
-    state_manager = get_global_player_state_manager()
-    monitor = get_global_monitor()
+    state_manager = get_player_state_manager()
+    monitor = get_monitor()
     
     # 断言，帮助类型检查器并增加运行时安全性
     assert state_manager is not None

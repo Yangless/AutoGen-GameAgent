@@ -4,9 +4,8 @@
 
 ## 🎯 系统概述
 
-本仓库当前同时维护两条链路：
+本仓库当前维护的默认运行链路为：
 - **默认运行链路**：`GamePlayerMonitoringSystem` -> `GameMonitoringTeamV2` -> `SingleThreadedAgentRuntime` -> `OrchestratorAgent` / Workers
-- **兼容运行链路**：`GamePlayerMonitoringSystem(use_v2_runtime=False)` -> `GameMonitoringTeam` -> `MagenticOneGroupChat`
 
 系统覆盖的核心能力包括：
 - **实时监控**：后台模拟并监控玩家行为
@@ -59,9 +58,7 @@
 3. **多智能体团队**
    - 默认入口使用 `GameMonitoringTeamV2`
    - 通过 `SingleThreadedAgentRuntime` 注册 orchestrator 和 3 个 workers
-   - legacy `GameMonitoringTeam` 仍保留，可通过 `use_v2_runtime=False` 回退
-
-### Legacy 兼容链路说明
+   - legacy `GameMonitoringTeam` 运行链路已移除
 
 #### 分析类智能体
 
@@ -191,10 +188,10 @@ container = bootstrap_application(
 orchestrator = container.resolve("OrchestratorAgent")
 ```
 
-3. **兼容模式说明**：
-   - 默认系统入口已经切到 `GameMonitoringTeamV2`
-   - 如果需要回退旧链路，可在 `GamePlayerMonitoringSystem(use_v2_runtime=False)` 下使用 `GameMonitoringTeam`
-   - 使用 legacy 团队时仍需要 `autogen_agentchat` 相关依赖
+3. **运行时说明**：
+   - 默认系统入口已经固定为 `GameMonitoringTeamV2`
+   - Streamlit Dashboard 通过 `bootstrap_application()` 和应用服务构建运行时
+   - 如需自定义装配，请从容器解析 `GameContext`、`ActionProcessingService` 和 `AgentService`
 
 ## 📊 默认运行流程（v2）
 
@@ -208,7 +205,7 @@ orchestrator = container.resolve("OrchestratorAgent")
    - `BehaviorWorker` 生成行为管控措施
 6. **结果合并**：Orchestrator 聚合去重后的干预动作并返回最终决策
 
-补充：legacy `MagenticOneGroupChat` 链路仍保留，但不再是默认执行路径。
+补充：旧版 `MagenticOneGroupChat` 团队链路已经下线，仓库内仅保留基于 orchestrator-worker 的运行路径。
 
 ## 🔧 自定义配置
 

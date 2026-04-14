@@ -4,7 +4,12 @@ from .churn_tool import assess_churn_risk_with_deps
 from .bot_tool import detect_bot_with_deps
 from .baseline_tool import get_historical_baseline_with_deps
 from .intervention_tools import execute_engagement_action, execute_guidance_action
-from .military_order_tool import generate_personalized_military_order, send_military_order
+
+try:
+    from .military_order_tool import generate_personalized_military_order, send_military_order
+except ModuleNotFoundError:
+    generate_personalized_military_order = None
+    send_military_order = None
 
 __all__ = [
     'analyze_emotion_with_deps',

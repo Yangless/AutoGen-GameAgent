@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 
 from ..simulator.player_behavior import PlayerBehavior
@@ -17,6 +17,8 @@ class BehaviorMonitor:
         self.rule_engine = PlayerBehaviorRuleEngine()
         self.player_action_sequences = {}  # 存储每个玩家的动作序列
         self.behavior_history = []  # 存储所有行为历史
+        self._negative_counts = {}  # 保持旧版高层行为阈值统计兼容
+        self.triggered_scenarios_by_player = {}  # 存储每个玩家最近一次规则命中
         self.threshold = threshold
         self.max_sequence_length = max_sequence_length
         self.recent_actions_window = recent_actions_window
@@ -24,10 +26,28 @@ class BehaviorMonitor:
     def add_behavior(self, behavior: PlayerBehavior) -> bool:
         """添加行为数据（保持向后兼容）"""
         self.behavior_history.append(behavior)
-        # 移除阈值判断逻辑，该逻辑已前置到process_atomic_action中
+
+        legacy_negative_actions = {
+            "发布消极评论",
+            "突然不充了",
+            "不买月卡了",
+            "玩家点击退出游戏",
+        }
+        if behavior.action in legacy_negative_actions:
+            current = self._negative_counts.get(behavior.player_id, 0) + 1
+            self._negative_counts[behavior.player_id] = current
+            if current >= self.threshold:
+                print(f"⚠️  触发监控阈值: 玩家 {behavior.player_id} 行为触发")
+                return True
+
         return False
     
-    def add_atomic_action(self, player_id: str, action_name: str) -> List[Dict]:
+    def add_atomic_action(
+        self,
+        player_id: str,
+        action_name: str,
+        params: Optional[Dict[str, Any]] = None,
+    ) -> List[Dict]:
         """添加原子动作到玩家序列并分析
         
         Args:
@@ -44,12 +64,22 @@ class BehaviorMonitor:
         # 创建动作数据
         action_data = {
             'action': action_name,
+            'params': params or {},
             'timestamp': datetime.now(),
             'player_id': player_id
         }
         
         # 添加到玩家序列
         self.player_action_sequences[player_id].append(action_data)
+        self.behavior_history.append(
+            PlayerBehavior(
+                player_id=player_id,
+                timestamp=action_data['timestamp'],
+                action=action_name,
+                result="success",
+                metadata=params or {},
+            )
+        )
         
         # 限制序列长度
         if len(self.player_action_sequences[player_id]) > self.max_sequence_length:
@@ -67,6 +97,7 @@ class BehaviorMonitor:
         
         # 使用规则引擎分析最近行为窗口
         triggered_scenarios = self.rule_engine.analyze_action_sequence(player_id, recent_actions)
+        self.triggered_scenarios_by_player[player_id] = triggered_scenarios
         
         # 输出触发的场景信息
         if triggered_scenarios:
@@ -81,6 +112,39 @@ class BehaviorMonitor:
         print(f"=== 分析完成 ===\n")
         
         return triggered_scenarios
+
+    def analyze_current_sequence(self, player_id: str) -> List[Dict]:
+        """重新分析玩家当前动作序列。"""
+        recent_actions = self.get_recent_actions_for_analysis(player_id)
+        triggered_scenarios = self.rule_engine.analyze_action_sequence(
+            player_id, recent_actions
+        )
+        self.triggered_scenarios_by_player[player_id] = triggered_scenarios
+        return triggered_scenarios
+
+    def get_triggered_scenarios(self, player_id: Optional[str] = None) -> List[Dict]:
+        """获取最近一次规则分析命中的场景。"""
+        if player_id is not None:
+            return list(self.triggered_scenarios_by_player.get(player_id, []))
+
+        scenarios = []
+        for player_scenarios in self.triggered_scenarios_by_player.values():
+            scenarios.extend(player_scenarios)
+        return scenarios
+
+    def get_negative_count(self, player_id: str) -> int:
+        """获取玩家当前的负面行为计数。"""
+        return self._negative_counts.get(player_id, 0)
+
+    def increment_negative_count(self, player_id: str) -> int:
+        """增加玩家的负面行为计数。"""
+        current = self.get_negative_count(player_id) + 1
+        self._negative_counts[player_id] = current
+        return current
+
+    def reset_negative_count(self, player_id: str) -> None:
+        """重置玩家的负面行为计数。"""
+        self._negative_counts[player_id] = 0
     
     def get_recent_actions_for_analysis(self, player_id: str) -> List[Dict]:
         """获取用于分析的最近行为
@@ -109,3 +173,4 @@ class BehaviorMonitor:
         """清空玩家动作序列（用于测试或重置）"""
         if player_id in self.player_action_sequences:
             self.player_action_sequences[player_id] = []
+        self.triggered_scenarios_by_player[player_id] = []

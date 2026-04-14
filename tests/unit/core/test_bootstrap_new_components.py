@@ -5,6 +5,7 @@ from game_monitoring.core.bootstrap import create_production_container
 from game_monitoring.infrastructure.validation.output_validator import (
     OutputValidator,
 )
+from game_monitoring.team.team_manager import GameMonitoringTeamV2
 
 
 def test_bootstrap_registers_orchestrator():
@@ -32,3 +33,12 @@ def test_bootstrap_registers_runtime():
     runtime = container.resolve(SingleThreadedAgentRuntime)
 
     assert isinstance(runtime, SingleThreadedAgentRuntime)
+
+
+def test_bootstrap_registers_v2_team_manager():
+    """测试生产容器默认注册新版 TeamManager。"""
+    container = create_production_container()
+
+    team = container.resolve(GameMonitoringTeamV2)
+
+    assert isinstance(team, GameMonitoringTeamV2)

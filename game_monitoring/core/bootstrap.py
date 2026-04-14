@@ -155,10 +155,14 @@ def create_production_container(
         monitor = c.resolve('BehaviorMonitorType')
         state_manager = c.resolve(PlayerStateManager)
         cfg = c.resolve(SystemConfig)
+        player_repository = c.resolve(PlayerRepository)
+        commander_order_repository = c.resolve(CommanderOrderRepository)
         return GameContext(
             monitor=monitor,
             player_state_manager=state_manager,
-            config=cfg
+            config=cfg,
+            player_repository=player_repository,
+            commander_order_repository=commander_order_repository,
         )
 
     container.register_factory(
@@ -169,7 +173,7 @@ def create_production_container(
 
     # 5. 注册Application Services
     from ..application.services.action_service import ActionProcessingService
-    from ..application.services.agent_service import AgentService
+    from ..application.services.agent_service import AgentService, create_team_factory
 
     container.register_factory(
         ActionProcessingService,
@@ -179,7 +183,10 @@ def create_production_container(
 
     container.register_factory(
         AgentService,
-        lambda c: AgentService(c.resolve(GameContext)),
+        lambda c: AgentService(
+            c.resolve(GameContext),
+            team_factory=create_team_factory(c),
+        ),
         lifetime=LifetimeScope.SCOPED
     )
 
@@ -191,6 +198,17 @@ def create_production_container(
     container.register_factory(
         SingleThreadedAgentRuntime,
         lambda c: SingleThreadedAgentRuntime(),
+        lifetime=LifetimeScope.SINGLETON
+    )
+
+    from ..team.team_manager import GameMonitoringTeamV2
+
+    container.register_factory(
+        GameMonitoringTeamV2,
+        lambda c: GameMonitoringTeamV2(
+            model_client=custom_model_client,
+            runtime=c.resolve(SingleThreadedAgentRuntime),
+        ),
         lifetime=LifetimeScope.SINGLETON
     )
 

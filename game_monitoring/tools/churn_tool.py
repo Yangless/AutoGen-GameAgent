@@ -3,7 +3,11 @@ from datetime import datetime
 
 def assess_churn_risk_with_deps(player_id: str) -> str:
     """评估指定玩家的流失风险，并实时更新到玩家状态中。"""
-    from ..context import get_global_monitor, get_global_player_state_manager, is_context_initialized
+    from .runtime_access import (
+        get_monitor,
+        get_player_state_manager,
+        is_context_initialized,
+    )
     
     # --- 修正点 1: 使用“卫语句”模式 ---
     # 在函数入口处立即检查依赖。如果未初始化，直接返回模拟/错误结果。
@@ -24,8 +28,8 @@ def assess_churn_risk_with_deps(player_id: str) -> str:
 
     # 如果代码能执行到这里，说明上下文已初始化，可以安全地获取和使用实例。
     # 这就从根本上避免了 "referenced before assignment" 错误。
-    monitor = get_global_monitor()
-    player_state_manager = get_global_player_state_manager()
+    monitor = get_monitor()
+    player_state_manager = get_player_state_manager()
     
     # 断言可以增加代码可读性和类型检查的安全性
     assert monitor is not None

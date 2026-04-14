@@ -49,6 +49,32 @@ def test_team_manager_v2_trigger_intervention():
     assert recipient == team.orchestrator_id
 
 
+def test_team_manager_v2_requests_player_scoped_triggered_scenarios():
+    """测试新版 TeamManager 优先读取带 player_id 的触发场景接口。"""
+
+    class FakeMonitor:
+        def get_triggered_scenarios(self, player_id):
+            assert player_id == "player_1"
+            return [{"scenario": "negative_behavior"}]
+
+        def get_behavior_history(self, player_id):
+            assert player_id == "player_1"
+            return [{"action": "quit_match"}]
+
+    runtime = AsyncMock()
+    runtime.send_message = AsyncMock(return_value={"status": "ok"})
+
+    team = GameMonitoringTeamV2(model_client=None, runtime=runtime)
+
+    result = asyncio.run(
+        team.trigger_analysis_and_intervention("player_1", FakeMonitor())
+    )
+
+    assert result == {"status": "ok"}
+    event, _ = runtime.send_message.await_args.args
+    assert event.triggered_scenarios == [{"scenario": "negative_behavior"}]
+
+
 def test_team_manager_v2_real_runtime_flow():
     """测试新版 TeamManager 在真实 runtime 上完成端到端消息链路"""
 

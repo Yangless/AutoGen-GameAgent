@@ -2,7 +2,7 @@ import json
 import random
 from typing import Dict, Any, List
 from datetime import datetime, timedelta
-from ..context import get_player_info
+from .runtime_access import get_player_info
 
 
 

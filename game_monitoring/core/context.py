@@ -17,7 +17,10 @@ from enum import Enum
 if TYPE_CHECKING:
     from ..monitoring.behavior_monitor import BehaviorMonitor
     from ..monitoring.player_state import PlayerStateManager
-    from ..domain.repositories.player_repository import PlayerRepository
+    from ..domain.repositories.player_repository import (
+        CommanderOrderRepository,
+        PlayerRepository,
+    )
 
 
 @dataclass(frozen=True)
@@ -90,11 +93,15 @@ class GameContext:
         self,
         monitor: 'BehaviorMonitor',
         player_state_manager: 'PlayerStateManager',
-        config: Optional[SystemConfig] = None
+        config: Optional[SystemConfig] = None,
+        player_repository: Optional['PlayerRepository'] = None,
+        commander_order_repository: Optional['CommanderOrderRepository'] = None,
     ):
         self._monitor = monitor
         self._player_state_manager = player_state_manager
         self._config = config or SystemConfig()
+        self._player_repository = player_repository
+        self._commander_order_repository = commander_order_repository
 
     @property
     def monitor(self) -> 'BehaviorMonitor':
@@ -110,6 +117,16 @@ class GameContext:
     def config(self) -> SystemConfig:
         """系统配置"""
         return self._config
+
+    @property
+    def player_repository(self) -> Optional['PlayerRepository']:
+        """玩家仓储。"""
+        return self._player_repository
+
+    @property
+    def commander_order_repository(self) -> Optional['CommanderOrderRepository']:
+        """军令仓储。"""
+        return self._commander_order_repository
 
     def for_player(self, player_id: str) -> 'PlayerContext':
         """
@@ -247,36 +264,3 @@ def get_global_context() -> Optional[GameContext]:
     新代码应使用依赖注入
     """
     return _global_context
-
-
-def get_global_monitor() -> Optional['BehaviorMonitor']:
-    """
-    获取全局Monitor（兼容性）
-
-    旧代码使用，将通过get_global_context获取
-    """
-    ctx = get_global_context()
-    if ctx:
-        return ctx.monitor
-    # 尝试从旧的全局变量获取
-    try:
-        from ..context import _monitor
-        return _monitor
-    except ImportError:
-        return None
-
-
-def get_global_player_state_manager() -> Optional['PlayerStateManager']:
-    """
-    获取全局PlayerStateManager（兼容性）
-
-    旧代码使用
-    """
-    ctx = get_global_context()
-    if ctx:
-        return ctx.player_state_manager
-    try:
-        from ..context import _player_state_manager
-        return _player_state_manager
-    except ImportError:
-        return None

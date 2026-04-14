@@ -2,6 +2,7 @@ import importlib
 import sys
 import types
 import asyncio
+import inspect
 
 from game_monitoring.team.team_manager import GameMonitoringTeamV2
 
@@ -18,6 +19,54 @@ def test_game_player_monitoring_system_uses_v2_team(monkeypatch):
     system = game_system_module.GamePlayerMonitoringSystem(model_client=None)
 
     assert isinstance(system.team, GameMonitoringTeamV2)
+
+
+def test_game_player_monitoring_system_no_longer_exposes_legacy_runtime_switch(monkeypatch):
+    """系统主入口不再暴露 legacy runtime 开关。"""
+    config_module = types.ModuleType("config")
+    config_module.custom_model_client = None
+    monkeypatch.setitem(sys.modules, "config", config_module)
+
+    game_system_module = importlib.import_module("game_monitoring.system.game_system")
+    game_system_module = importlib.reload(game_system_module)
+
+    parameters = inspect.signature(
+        game_system_module.GamePlayerMonitoringSystem.__init__
+    ).parameters
+
+    legacy_runtime_parameter = "use_v2" + "_runtime"
+
+    assert legacy_runtime_parameter not in parameters
+
+
+def test_game_player_monitoring_system_bootstraps_context_with_repositories(monkeypatch):
+    """系统主入口创建的上下文应带上仓储依赖。"""
+    config_module = types.ModuleType("config")
+    config_module.custom_model_client = None
+    monkeypatch.setitem(sys.modules, "config", config_module)
+
+    game_system_module = importlib.import_module("game_monitoring.system.game_system")
+    game_system_module = importlib.reload(game_system_module)
+
+    system = game_system_module.GamePlayerMonitoringSystem(model_client=None)
+
+    assert system.context.player_repository is not None
+    assert system.context.commander_order_repository is not None
+
+
+def test_game_player_monitoring_system_uses_bootstrap_application(monkeypatch):
+    """系统主入口应复用 bootstrap_application，而不是手动写兼容全局上下文。"""
+    config_module = types.ModuleType("config")
+    config_module.custom_model_client = None
+    monkeypatch.setitem(sys.modules, "config", config_module)
+
+    game_system_module = importlib.import_module("game_monitoring.system.game_system")
+    game_system_module = importlib.reload(game_system_module)
+
+    source = inspect.getsource(game_system_module.GamePlayerMonitoringSystem.__init__)
+
+    assert "bootstrap_application" in source
+    assert "set_global_context" not in source
 
 
 def test_game_player_monitoring_system_logs_v2_intervention_result(monkeypatch):
