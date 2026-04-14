@@ -120,6 +120,31 @@ class GameMonitoringConsole:
     def print_team_activation(player_id: str):
         """打印团队激活信息"""
         print(f"\n🤖 启动多智能体团队，为玩家 {player_id} 进行分析和干预...")
+
+    @staticmethod
+    def print_intervention_result(result):
+        """打印 v2 runtime 的结构化干预结果。"""
+        if not isinstance(result, dict):
+            return
+
+        player_id = result.get("player_id", "unknown")
+        session_id = result.get("session_id", "unknown")
+        worker_count = result.get("worker_count", 0)
+        confidence = result.get("overall_confidence", 0.0)
+        actions = result.get("final_actions", [])
+
+        print(f"📊 玩家 {player_id} 干预结果已生成")
+        print(f"   会话ID: {session_id}")
+        print(f"   Worker数量: {worker_count}")
+        print(f"   综合置信度: {confidence:.2f}")
+
+        if actions:
+            print("   最终动作:")
+            for action in actions:
+                action_type = action.get("action_type", "unknown")
+                print(f"   - {action_type}: {action}")
+        else:
+            print("   最终动作: 无")
     
     @staticmethod
     def print_error(message: str):

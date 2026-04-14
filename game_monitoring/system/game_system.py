@@ -56,7 +56,10 @@ class GamePlayerMonitoringSystem:
     async def trigger_analysis_and_intervention(self, player_id: str):
         """触发对指定玩家的分析和干预"""
         self.ui.print_team_activation(player_id)
-        return await self.team.trigger_analysis_and_intervention(player_id, self.monitor)
+        result = await self.team.trigger_analysis_and_intervention(player_id, self.monitor)
+        if hasattr(self.ui, "print_intervention_result"):
+            self.ui.print_intervention_result(result)
+        return result
         # 计数器重置现在在streamlit_dashboard.py中处理
 
     async def simulate_monitoring_session(self, duration_seconds: int = 60, mode: str = "random", dataset_type: str = "mixed"):
