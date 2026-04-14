@@ -4,19 +4,21 @@
 
 ## 🎯 系统概述
 
-本系统使用 MagenticOneGroupChat 管理多个专业分析工具 Agent，实现：
+本仓库当前同时维护两条链路：
+- **兼容运行链路**：`GamePlayerMonitoringSystem` -> `GameMonitoringTeam` -> `MagenticOneGroupChat`，用于现有 Dashboard 和旧入口
+- **新架构模块链路**：`OrchestratorAgent` / Workers + `OutputValidator` + `MemoryService`，已完成核心代码与测试验证，后续可继续推进默认运行入口切换
+
+系统覆盖的核心能力包括：
 - **实时监控**：后台模拟并监控玩家行为
 - **智能触发**：当负面指标达到预设阈值时自动触发分析
-- **多智能体协作**：多个专业 Agent 协同分析和响应
+- **多智能体协作**：按不同分析职责拆分处理和响应
 - **自动干预**：根据分析结果自动执行相应的干预措施
 
 ## 🏗️ 系统架构
 
-## 架构改进（v2.0）
+### 新架构模块（v2.0）
 
-### Orchestrator-Worker 架构
-
-系统已新增面向高吞吐与可控输出的 Orchestrator-Worker 架构：
+仓库中已经实现面向高吞吐与可控输出的 Orchestrator-Worker 模块：
 
 - `OrchestratorAgent`：接收玩家事件、生成任务、汇总多个 Worker 结果
 - `EmotionWorker`：分析情绪并选择安抚策略
@@ -40,9 +42,9 @@
 | 输出错误率 | ≤11% | 已添加验证测试 |
 | Token消耗降低 | ≥55% | 已添加验证测试 |
 
-部署说明见 [docs/deployment/orchestrator-worker-deployment.md](docs/deployment/orchestrator-worker-deployment.md)。
+说明：当前 [`game_monitoring/system/game_system.py`](game_monitoring/system/game_system.py) 和 [`streamlit_dashboard.py`](streamlit_dashboard.py) 仍使用兼容运行链路；新架构模块的验证主要通过 `tests/` 下的单元、集成和性能测试完成。部署与模块验证说明见 [docs/deployment/orchestrator-worker-deployment.md](docs/deployment/orchestrator-worker-deployment.md)。
 
-### 核心组件
+### 当前运行时组件（兼容模式）
 
 1. **玩家行为模拟器** (`PlayerBehaviorSimulator`)
    - 模拟真实的玩家行为数据
@@ -55,10 +57,11 @@
    - 维护玩家行为历史记录
 
 3. **多智能体团队**
-   - 6个专业分析和干预 Agent
-   - 基于 AutoGen 的 MagenticOneGroupChat 架构
+   - 现有 Dashboard 入口仍使用 `GameMonitoringTeam`
+   - 依赖 AutoGen 的 `MagenticOneGroupChat` 兼容链路
+   - 与新架构模块并存，便于渐进迁移
 
-### 智能体详细说明
+### 兼容模式智能体说明
 
 #### 分析类智能体
 
@@ -144,19 +147,23 @@
 - Python 3.10+
 - UV 包管理器
 - AutoGen 相关依赖
+- Redis（用于记忆服务和相关验证）
 
 ### 安装和运行
 
 ```bash
 # 克隆项目
 git clone <repository-url>
-cd AutoGen-Agent
+cd AutoGen-GameAgent
 
 # 安装依赖（如果需要）
 uv sync
 
-# 运行系统
-uv run main.py
+# 启动现有 Dashboard 入口
+streamlit run streamlit_dashboard.py
+
+# 运行自动化验证
+uv run python -m pytest tests -v
 ```
 
 ### 配置说明
@@ -173,23 +180,22 @@ model_client = OpenAIChatCompletionClient(
 )
 ```
 
-2. **MagenticOneGroupChat 团队**：
+2. **新架构模块引导**：
 ```python
-from autogen_agentchat.teams import MagenticOneGroupChat
+from game_monitoring.core.bootstrap import bootstrap_application
 
-analysis_team = MagenticOneGroupChat(
-    agents=[
-        emotion_agent,
-        churn_agent,
-        bot_agent,
-        state_agent,
-        engagement_agent,
-        guidance_agent
-    ]
+container = bootstrap_application(
+    custom_model_client=model_client,
+    setup_global_context=False,
 )
+orchestrator = container.resolve("OrchestratorAgent")
 ```
 
-## 📊 系统工作流程
+3. **兼容模式说明**：
+   - [`streamlit_dashboard.py`](streamlit_dashboard.py) 和 [`game_monitoring/system/game_system.py`](game_monitoring/system/game_system.py) 当前仍依赖 `GameMonitoringTeam`
+   - 如果需要使用现有演示界面，请保留 `autogen_agentchat` 相关依赖
+
+## 📊 当前运行流程（兼容模式）
 
 1. **行为生成**：系统持续模拟玩家行为
 2. **实时监控**：监控器检查每个行为是否为负面行为
@@ -201,6 +207,8 @@ analysis_team = MagenticOneGroupChat(
    - 状态聚合智能体整合所有分析结果
 5. **自动干预**：根据分析结果执行相应的干预措施
 6. **状态重置**：完成干预后重置该玩家的负面行为计数
+
+补充：新架构模块的任务拆分、结果合并、记忆服务和性能指标可通过 `tests/integration/` 与 `tests/performance/` 下的测试验证。
 
 ## 🔧 自定义配置
 

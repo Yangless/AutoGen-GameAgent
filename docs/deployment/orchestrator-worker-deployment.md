@@ -1,5 +1,7 @@
 # Orchestrator-Worker架构部署指南
 
+> 当前文档覆盖 Orchestrator-Worker 模块的依赖准备、Redis 配置和 bootstrap 验证方式。仓库默认的 Streamlit / `GamePlayerMonitoringSystem` 运行入口仍使用兼容链路，尚未切换为 v2 runtime。
+
 ## 环境要求
 
 - Python 3.10+
@@ -51,10 +53,12 @@ event = PlayerEvent(
 tasks = orchestrator._generate_tasks(event)
 ```
 
+以上示例验证的是模块装配和任务生成，不包含 `SingleThreadedAgentRuntime` 的完整注册、订阅和消息广播生命周期。
+
 ## 运行验证
 
 ```bash
-uv run --with pytest python -m pytest tests/unit tests/integration -v
+uv run python -m pytest tests -v
 ```
 
 ## 性能指标
@@ -67,3 +71,4 @@ uv run --with pytest python -m pytest tests/unit tests/integration -v
 
 - `MemoryService` 当前支持注入式 client 和延迟 Redis 连接，便于本地测试与生产部署共存。
 - `GameMonitoringTeamV2` 使用 `AgentId("orchestrator", "default")` 作为新版入口。
+- 现有可视化与系统主入口尚未默认切换到 `GameMonitoringTeamV2`，落地前需补齐 runtime 注册与真实入口集成。
