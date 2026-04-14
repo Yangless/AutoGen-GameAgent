@@ -23,6 +23,7 @@ from game_monitoring.system import GamePlayerMonitoringSystem
 from game_monitoring.simulator.behavior_simulator import PlayerBehaviorSimulator, PlayerBehaviorRuleEngine
 from game_monitoring.simulator.player_behavior import PlayerBehavior, PlayerActionDefinitions
 from game_monitoring.context import get_global_monitor, get_global_player_state_manager
+from game_monitoring.ui.intervention_result_view import store_intervention_result
 
 
 # import mlflow
@@ -230,6 +231,8 @@ if 'team_analysis_capture' not in st.session_state:
     st.session_state.team_analysis_capture = TeamAnalysisLogCapture()
 if 'team_analysis_logs' not in st.session_state:
     st.session_state.team_analysis_logs = []
+if 'team_analysis_results' not in st.session_state:
+    st.session_state.team_analysis_results = []
 if 'agent_analysis_logs' not in st.session_state:
     st.session_state.agent_analysis_logs = []
 if 'player_negative_counts' not in st.session_state:
@@ -323,6 +326,26 @@ def add_agent_log(message: str):
     # 保持最近30条记录
     if len(st.session_state.agent_logs) > 50:
         st.session_state.agent_logs = st.session_state.agent_logs[-50:]
+
+
+def store_team_analysis_result(result):
+    """保存 v2 干预结果，供 Dashboard 直接渲染。"""
+    if not isinstance(result, dict):
+        return
+
+    st.session_state.team_analysis_results = store_intervention_result(
+        st.session_state.team_analysis_results,
+        result,
+        captured_at=datetime.now(),
+        limit=10,
+    )
+
+    player_id = result.get("player_id", "unknown")
+    action_count = len(result.get("final_actions", []) or [])
+    confidence = float(result.get("overall_confidence", 0.0))
+    add_agent_log(
+        f"🧠 v2 干预完成: 玩家 {player_id}, 动作数 {action_count}, 综合置信度 {confidence:.2f}"
+    )
 
 async def process_atomic_action(player_id: str, action_name: str):
     """处理原子动作并通过规则引擎分析
@@ -452,7 +475,10 @@ async def _trigger_async_intervention(system, player_id: str):
                 # 创建新的事件循环并运行干预
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                loop.run_until_complete(system.trigger_analysis_and_intervention(player_id))
+                result = loop.run_until_complete(
+                    system.trigger_analysis_and_intervention(player_id)
+                )
+                store_team_analysis_result(result)
                 loop.close()
                 
             finally:
@@ -508,7 +534,8 @@ async def trigger_behavior_and_analysis(player_id: str, behavior_type: str, spec
             sys.stdout = team_capture
             
             # 触发分析和干预
-            await system.trigger_analysis_and_intervention(player_id)
+            result = await system.trigger_analysis_and_intervention(player_id)
+            store_team_analysis_result(result)
             
             add_agent_log(f"✅ 团队分析完成，共捕获 {len(team_capture.get_all_logs())} 条日志")
             
@@ -791,14 +818,41 @@ def main():
                 if st.button("🗑️ 清空日志", key="clear_team_logs"):
                     if 'team_analysis_capture' in st.session_state:
                         st.session_state.team_analysis_capture.clear_logs()
-                        st.rerun()
+                    st.session_state.team_analysis_results = []
+                    st.rerun()
             
             with col_count:
                 log_count = 0
                 if 'team_analysis_capture' in st.session_state and st.session_state.team_analysis_capture:
                     log_count = len(st.session_state.team_analysis_capture.get_all_logs())
-                st.write(f"📊 当前日志条数: {log_count}")
-            
+                result_count = len(st.session_state.team_analysis_results)
+                st.write(f"📊 当前日志条数: {log_count} | 结果数: {result_count}")
+
+            if st.session_state.team_analysis_results:
+                st.markdown("**🎯 最新结构化决策结果**")
+                for index, result in enumerate(
+                    reversed(st.session_state.team_analysis_results[-3:]),
+                    start=1,
+                ):
+                    title = (
+                        f"{result['player_id']} | {result['captured_at']} | "
+                        f"{len(result['action_labels'])} actions"
+                    )
+                    with st.expander(title, expanded=(index == 1)):
+                        st.markdown(f"**会话ID:** `{result['session_id']}`")
+                        st.markdown(f"**Worker 数量:** {result['worker_count']}")
+                        st.markdown(
+                            f"**综合置信度:** {result['overall_confidence']:.2f}"
+                        )
+                        if result["action_labels"]:
+                            st.markdown(
+                                f"**动作类型:** {', '.join(result['action_labels'])}"
+                            )
+                        if result["final_actions"]:
+                            st.json(result["final_actions"])
+                        else:
+                            st.info("无最终动作。")
+             
             # 显示团队分析日志 - 直接从 team_analysis_capture 获取日志
             team_logs = []
             if 'team_analysis_capture' in st.session_state and st.session_state.team_analysis_capture:
