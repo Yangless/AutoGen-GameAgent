@@ -3,19 +3,26 @@ import random
 import time
 from datetime import datetime
 
-from config import custom_model_client
+from autogen_core import SingleThreadedAgentRuntime
+
+try:
+    from config import custom_model_client
+except ModuleNotFoundError:
+    custom_model_client = None
+
 from ..simulator import PlayerBehaviorSimulator
 from ..monitoring import BehaviorMonitor
 from ..monitoring.player_state import PlayerStateManager
-from ..team import GameMonitoringTeam
+from ..team import GameMonitoringTeam, GameMonitoringTeamV2
 from ..ui import GameMonitoringConsole
 from .action_sequence_manager import ActionSequenceManager
 
 class GamePlayerMonitoringSystem:
     """游戏玩家监控系统主协调器"""
     
-    def __init__(self, model_client=None):
+    def __init__(self, model_client=None, use_v2_runtime: bool = True):
         self.model_client = model_client or custom_model_client
+        self.use_v2_runtime = use_v2_runtime
         self.simulator = PlayerBehaviorSimulator()
         # 创建监控器实例
         self.monitor = BehaviorMonitor(threshold=3)
@@ -26,11 +33,17 @@ class GamePlayerMonitoringSystem:
         from ..context import initialize_context
         initialize_context(self.monitor, self.player_state_manager)
         
-        # 创建多智能体团队，使用默认 player_id
-        self.team = GameMonitoringTeam(
-            model_client=self.model_client,
-            player_id="player_1"  # 默认玩家ID，可以根据需要动态创建
-        )
+        if self.use_v2_runtime:
+            self.team = GameMonitoringTeamV2(
+                model_client=self.model_client,
+                runtime=SingleThreadedAgentRuntime(),
+            )
+        else:
+            # 创建多智能体团队，使用默认 player_id
+            self.team = GameMonitoringTeam(
+                model_client=self.model_client,
+                player_id="player_1"  # 默认玩家ID，可以根据需要动态创建
+            )
         
         # 创建UI控制台
         self.ui = GameMonitoringConsole()
@@ -43,7 +56,7 @@ class GamePlayerMonitoringSystem:
     async def trigger_analysis_and_intervention(self, player_id: str):
         """触发对指定玩家的分析和干预"""
         self.ui.print_team_activation(player_id)
-        await self.team.trigger_analysis_and_intervention(player_id, self.monitor)
+        return await self.team.trigger_analysis_and_intervention(player_id, self.monitor)
         # 计数器重置现在在streamlit_dashboard.py中处理
 
     async def simulate_monitoring_session(self, duration_seconds: int = 60, mode: str = "random", dataset_type: str = "mixed"):

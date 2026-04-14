@@ -1,7 +1,7 @@
 # Orchestrator-Worker架构实施 - 当前状态
 
 **原始计划**: `docs/superpowers/plans/2026-04-13-orchestrator-worker-architecture.md`
-**当前结论**: 原文档中“Task 2-19 待执行”的状态已经过期。相关模块、测试、性能校验和基础文档均已落库，当前更准确的剩余工作是运行时默认入口切换，而不是继续按旧计划逐条补文件。
+**当前结论**: 原文档中“Task 2-19 待执行”的状态已经过期。相关模块、测试、性能校验和基础文档均已落库，默认运行入口也已经切到 v2 runtime；当前剩余工作是运行时加固和 legacy 清理，而不是继续按旧计划逐条补文件。
 
 ---
 
@@ -26,36 +26,41 @@
 
 ## 实际剩余工作
 
-### 1. 默认运行入口切换
+### 1. v2 Runtime 加固
 
-以下入口当前仍依赖 legacy `GameMonitoringTeam` / `MagenticOneGroupChat` 兼容链路：
+当前默认入口已经使用 v2，但还有工程化加固空间：
 
 - `game_monitoring/system/game_system.py`
 - `streamlit_dashboard.py`
-- `STREAMLIT_README.md`
 
-### 2. v2 Runtime 真正接线
+建议继续补强：
 
-在切换默认入口前，还需要补齐真实运行时能力，而不仅仅是对象创建和方法级测试：
+- 持久化 runtime 生命周期管理
+- 更完整的 worker 策略与真实工具调用
+- 更强的异常恢复和日志暴露
 
-- `SingleThreadedAgentRuntime` 中注册 orchestrator / workers
-- 补齐消息订阅、广播、生命周期管理
-- 增加覆盖 `send_message()` 真实链路的端到端测试
+### 2. legacy 链路清理
+
+以下兼容代码仍在仓库中，可根据上线策略决定是否继续保留：
+
+- `game_monitoring/team/team_manager.py` 中的 `GameMonitoringTeam`
+- `game_monitoring/ui/console_ui.py` 中对 `autogen_agentchat` 的兼容导入
+- 旧版依赖说明与 legacy agent 说明文档
 
 ### 3. 文档持续收口
 
 对外文档需要持续明确区分两件事：
 
 - 哪些模块“已经实现并有测试覆盖”
-- 哪些入口“已经成为默认运行路径”
+- 哪些能力“已经成为默认运行路径”
 
 ## 建议下一步
 
-如果继续推进实现，下一批工作建议聚焦在“运行时切换”而不是重复补当前已存在的文件：
+如果继续推进实现，下一批工作建议聚焦在“运行时硬化”而不是重复补当前已存在的文件：
 
-1. 为 v2 orchestrator / workers 建立真实 runtime 注册流程
-2. 新增可执行的系统入口或在 `GamePlayerMonitoringSystem` 中引入切换开关
-3. 为 Streamlit / 系统主入口补一条真实的 v2 集成测试链路
+1. 为 v2 orchestrator / workers 增加更真实的工具调用与状态回写
+2. 为 Streamlit 补充面向 v2 决策结果的日志与展示
+3. 评估是否删除或冻结 legacy `MagenticOneGroupChat` 链路
 
 ---
 

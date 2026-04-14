@@ -5,7 +5,6 @@
 """
 
 from dataclasses import dataclass
-from datetime import datetime
 from typing import List, Dict, Any
 try:
     from typing import Literal
@@ -30,7 +29,7 @@ class InterventionTask:
     session_id: str
     task_type: Literal["emotion", "churn", "behavior"]
     context: Dict[str, Any]
-    timestamp: datetime
+    timestamp: str
 
 
 @dataclass

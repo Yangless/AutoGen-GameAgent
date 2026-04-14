@@ -1,4 +1,7 @@
-from autogen_agentchat.ui import Console
+try:
+    from autogen_agentchat.ui import Console
+except ModuleNotFoundError:
+    Console = None
 
 class GameMonitoringConsole:
     """
@@ -17,6 +20,10 @@ class GameMonitoringConsole:
         Args:
             team_stream: MagenticOneGroupChat.run_stream() 返回的流式对象
         """
+        if self.console is None:
+            raise ModuleNotFoundError(
+                "GameMonitoringConsole.display_team_stream requires autogen_agentchat."
+            )
         print("\n" + "="*25 + " 团队实时动态 " + "="*23)
         await self.console(team_stream)
         print("="*62 + "\n")

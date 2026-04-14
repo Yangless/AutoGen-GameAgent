@@ -5,8 +5,8 @@
 ## 🎯 系统概述
 
 本仓库当前同时维护两条链路：
-- **兼容运行链路**：`GamePlayerMonitoringSystem` -> `GameMonitoringTeam` -> `MagenticOneGroupChat`，用于现有 Dashboard 和旧入口
-- **新架构模块链路**：`OrchestratorAgent` / Workers + `OutputValidator` + `MemoryService`，已完成核心代码与测试验证，后续可继续推进默认运行入口切换
+- **默认运行链路**：`GamePlayerMonitoringSystem` -> `GameMonitoringTeamV2` -> `SingleThreadedAgentRuntime` -> `OrchestratorAgent` / Workers
+- **兼容运行链路**：`GamePlayerMonitoringSystem(use_v2_runtime=False)` -> `GameMonitoringTeam` -> `MagenticOneGroupChat`
 
 系统覆盖的核心能力包括：
 - **实时监控**：后台模拟并监控玩家行为
@@ -42,9 +42,9 @@
 | 输出错误率 | ≤11% | 已添加验证测试 |
 | Token消耗降低 | ≥55% | 已添加验证测试 |
 
-说明：当前 [`game_monitoring/system/game_system.py`](game_monitoring/system/game_system.py) 和 [`streamlit_dashboard.py`](streamlit_dashboard.py) 仍使用兼容运行链路；新架构模块的验证主要通过 `tests/` 下的单元、集成和性能测试完成。部署与模块验证说明见 [docs/deployment/orchestrator-worker-deployment.md](docs/deployment/orchestrator-worker-deployment.md)。
+说明：[`game_monitoring/system/game_system.py`](game_monitoring/system/game_system.py) 和 [`streamlit_dashboard.py`](streamlit_dashboard.py) 现在默认走 v2 runtime；新架构的验证通过 `tests/` 下的单元、集成和性能测试完成。部署与模块验证说明见 [docs/deployment/orchestrator-worker-deployment.md](docs/deployment/orchestrator-worker-deployment.md)。
 
-### 当前运行时组件（兼容模式）
+### 默认运行时组件（v2）
 
 1. **玩家行为模拟器** (`PlayerBehaviorSimulator`)
    - 模拟真实的玩家行为数据
@@ -57,11 +57,11 @@
    - 维护玩家行为历史记录
 
 3. **多智能体团队**
-   - 现有 Dashboard 入口仍使用 `GameMonitoringTeam`
-   - 依赖 AutoGen 的 `MagenticOneGroupChat` 兼容链路
-   - 与新架构模块并存，便于渐进迁移
+   - 默认入口使用 `GameMonitoringTeamV2`
+   - 通过 `SingleThreadedAgentRuntime` 注册 orchestrator 和 3 个 workers
+   - legacy `GameMonitoringTeam` 仍保留，可通过 `use_v2_runtime=False` 回退
 
-### 兼容模式智能体说明
+### Legacy 兼容链路说明
 
 #### 分析类智能体
 
@@ -163,7 +163,7 @@ uv sync
 streamlit run streamlit_dashboard.py
 
 # 运行自动化验证
-uv run python -m pytest tests -v
+uv run python -m pytest tests game_monitoring/tests/test_container.py -v
 ```
 
 ### 配置说明
@@ -192,23 +192,23 @@ orchestrator = container.resolve("OrchestratorAgent")
 ```
 
 3. **兼容模式说明**：
-   - [`streamlit_dashboard.py`](streamlit_dashboard.py) 和 [`game_monitoring/system/game_system.py`](game_monitoring/system/game_system.py) 当前仍依赖 `GameMonitoringTeam`
-   - 如果需要使用现有演示界面，请保留 `autogen_agentchat` 相关依赖
+   - 默认系统入口已经切到 `GameMonitoringTeamV2`
+   - 如果需要回退旧链路，可在 `GamePlayerMonitoringSystem(use_v2_runtime=False)` 下使用 `GameMonitoringTeam`
+   - 使用 legacy 团队时仍需要 `autogen_agentchat` 相关依赖
 
-## 📊 当前运行流程（兼容模式）
+## 📊 默认运行流程（v2）
 
 1. **行为生成**：系统持续模拟玩家行为
 2. **实时监控**：监控器检查每个行为是否为负面行为
-3. **阈值触发**：当玩家负面行为达到阈值（默认3次）时触发分析
-4. **多智能体分析**：
-   - 情绪识别智能体分析玩家情绪
-   - 流失风险智能体评估流失概率
-   - 机器人检测智能体判断是否为异常行为
-   - 状态聚合智能体整合所有分析结果
-5. **自动干预**：根据分析结果执行相应的干预措施
-6. **状态重置**：完成干预后重置该玩家的负面行为计数
+3. **阈值触发**：当玩家负面行为达到阈值（默认3次）时构造 `PlayerEvent`
+4. **Orchestrator 编排**：`GameMonitoringTeamV2` 通过 runtime 将事件发送到 `OrchestratorAgent`
+5. **Worker 执行**：
+   - `EmotionWorker` 生成情绪安抚建议
+   - `ChurnWorker` 生成流失挽回方案
+   - `BehaviorWorker` 生成行为管控措施
+6. **结果合并**：Orchestrator 聚合去重后的干预动作并返回最终决策
 
-补充：新架构模块的任务拆分、结果合并、记忆服务和性能指标可通过 `tests/integration/` 与 `tests/performance/` 下的测试验证。
+补充：legacy `MagenticOneGroupChat` 链路仍保留，但不再是默认执行路径。
 
 ## 🔧 自定义配置
 

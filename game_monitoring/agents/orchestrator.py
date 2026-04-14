@@ -6,11 +6,12 @@ Orchestrator Agent实现
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import datetime
 from typing import Any
 
-from autogen_core import RoutedAgent
+from autogen_core import AgentId, MessageContext, RoutedAgent, rpc
 
 from ..domain.messages import InterventionTask, PlayerEvent, WorkerResponse
 
@@ -22,6 +23,27 @@ class OrchestratorAgent(RoutedAgent):
         super().__init__("Intervention orchestrator")
         self.model_client = model_client
         self.worker_types = worker_types
+
+    @rpc
+    async def handle_player_event(
+        self, message: PlayerEvent, ctx: MessageContext
+    ) -> dict:
+        """处理玩家事件并聚合所有 worker 响应。"""
+        tasks = self._generate_tasks(message)
+        worker_results = await asyncio.gather(
+            *[
+                self.send_message(
+                    task,
+                    AgentId(f"{task.task_type}_worker", "default"),
+                )
+                for task in tasks
+            ]
+        )
+
+        final_result = self._merge_results(worker_results)
+        final_result["player_id"] = message.player_id
+        final_result["session_id"] = message.session_id
+        return final_result
 
     def _generate_tasks(self, message: PlayerEvent) -> list[InterventionTask]:
         """基于配置的 worker 类型生成任务包。"""
@@ -37,7 +59,7 @@ class OrchestratorAgent(RoutedAgent):
                     "triggered_scenarios": message.triggered_scenarios,
                     "behavior_history": message.behavior_history,
                 },
-                timestamp=datetime.now(),
+                timestamp=datetime.now().isoformat(),
             )
             tasks.append(task)
 
